@@ -1,0 +1,8 @@
+{
+  "precisionRepository": "https://github.com/ersh1/Precision.git",
+  "precisionRef": "HEAD",
+  "commonLibRepository": "https://github.com/alandtse/CommonLibSSE-NG.git",
+  "commonLibRef": "8b032fa992750d654d6d38a33731714d8b86be1f",
+  "vcpkgRepository": "https://github.com/microsoft/vcpkg.git",
+  "jobs": 6
+}

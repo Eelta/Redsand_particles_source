@@ -1,0 +1,6 @@
+cmake_minimum_required(VERSION 3.22)
+project(RedsandDrainTests LANGUAGES CXX)
+add_executable(drain_tests drain_tests.cpp)
+target_compile_features(drain_tests PRIVATE cxx_std_20)
+enable_testing()
+add_test(NAME independent_particle_drain COMMAND drain_tests)
