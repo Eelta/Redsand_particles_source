@@ -1,0 +1,24 @@
+# Build workspace (downloaded dependencies and intermediate files)
+/.build/
+/build/
+/cmake-build-*/
+
+# Generated packages, build metadata and error reports
+/output/
+
+# Local compiler / IDE artifacts
+.vs/
+CMakeFiles/
+CMakeCache.txt
+*.obj
+*.o
+*.pch
+*.pdb
+*.ilk
+*.exp
+*.lib
+*.dll
+
+# Python caches
+__pycache__/
+*.pyc

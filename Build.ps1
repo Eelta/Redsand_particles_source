@@ -159,6 +159,24 @@ try {
     if ($cpp.Contains('UpdateRedsandParticles')) { throw 'Unexpected pre-patched Precision checkout.' }
     $includes = "#include `"RE/N/NiParticleSystem.h`"`n#include `"RE/N/NiPSysModifier.h`"`n#include `"RE/N/NiParticlesData.h`"`n#include `"RE/N/NiPSysData.h`"`n"
     $cpp = Replace-One $cpp '#include "AttackTrail.h"' ("#include `"AttackTrail.h`"`n" + $includes)
+    $anchor = "`t`t`t`t`teffectShaderMaterial->baseColorScale *= Settings::fTrailBaseColorScaleMult;"
+    $cpp = Replace-One $cpp $anchor ((Text (Join-Path $PSScriptRoot 'source/ParticleBrightness.inc')) + $anchor)
+    $anchor = "`t`tstd::string trailMeshPath = Settings::attackTrailMeshPath;"
+    $cpp = Replace-One $cpp $anchor ((Text (Join-Path $PSScriptRoot 'source/TrailActorStyle.inc')) + $anchor)
+    # Skip particle definitions for the legacy ribbon actor before evaluating either list.
+    foreach ($list in @('All', 'Any')) {
+        $anchor = "auto search$list = std::find_if(Settings::trailDefinitions$list.begin(), Settings::trailDefinitions$list.end(), [&](const TrailDefinition& a_trailDefinition) {"
+        $guard = "`n`t`tif (redsandLegacyTrail && a_trailDefinition.trailOverride.meshOverride && a_trailDefinition.trailOverride.meshOverride->starts_with(`"Effects/WeaponTrails/ElementalDesert/`")) {`n`t`t`treturn false;`n`t`t}"
+        $cpp = Replace-One $cpp $anchor ($anchor + $guard)
+    }
+    # Preserve the supplied ribbon preset's 1-second lifetime/fade and 2.6 brightness.
+    foreach ($setting in @(@('fTrailSegmentLifetime', 3, '1.f'), @('fTrailFadeOutTime', 4, '1.f'), @('fTrailBaseColorScaleMult', 1, '2.6f'))) {
+        $needle = 'Settings::' + $setting[0]
+        if ([regex]::Matches($cpp, [regex]::Escape($needle)).Count -ne $setting[1]) { throw 'Upstream trail settings changed. Review the ribbon compatibility patch.' }
+        $cpp = $cpp.Replace($needle, "(redsandLegacyTrail ? $($setting[2]) : $needle)")
+    }
+    $anchor = "`t`ttrailParticle = RE::NiPointer<RE::BSTempEffectParticle>(RE::BSTempEffectParticle::Spawn("
+    $cpp = Replace-One $cpp $anchor ((Text (Join-Path $PSScriptRoot 'source/TrailDensity.inc')) + $anchor)
     $anchor = "`t`tconstexpr RE::NiPoint3 forwardVector{ 1.f, 0.f, 0.f };"
     $cpp = Replace-One $cpp $anchor ((Text (Join-Path $PSScriptRoot 'source/TrailUpdate.inc')) + $anchor)
     $anchor = 'bool AttackTrail::GetTrailDefinition('

@@ -6,6 +6,7 @@
       "OverrideMerge": false,
       "Filters": {
         "HitContext": {
+          "Conditions": ["PrecisionParticleMatch.esp:0x80A"],
           "WeaponTypes": [
             "OneHandSword",
             "TwoHandSword",
@@ -71,6 +72,7 @@
       "OverrideMerge": false,
       "Filters": {
         "HitContext": {
+          "Conditions": ["PrecisionParticleMatch.esp:0x80A"],
           "WeaponTypes": [
             "OneHandSword",
             "TwoHandSword",
@@ -129,6 +131,7 @@
       "OverrideMerge": false,
       "Filters": {
         "HitContext": {
+          "Conditions": ["PrecisionParticleMatch.esp:0x80A"],
           "WeaponTypes": [
             "OneHandSword",
             "TwoHandSword",
@@ -185,6 +188,7 @@
       "OverrideMerge": false,
       "Filters": {
         "HitContext": {
+          "Conditions": ["PrecisionParticleMatch.esp:0x80A"],
           "WeaponTypes": [
             "OneHandSword",
             "TwoHandSword",
@@ -247,6 +251,7 @@
       "OverrideMerge": false,
       "Filters": {
         "HitContext": {
+          "Conditions": ["PrecisionParticleMatch.esp:0x80A"],
           "WeaponTypes": [
             "OneHandSword",
             "TwoHandSword",
@@ -307,6 +312,7 @@
       "OverrideMerge": false,
       "Filters": {
         "HitContext": {
+          "Conditions": ["PrecisionParticleMatch.esp:0x80A"],
           "WeaponTypes": [
             "OneHandSword",
             "TwoHandSword",
@@ -355,6 +361,7 @@
       "OverrideMerge": false,
       "Filters": {
         "HitContext": {
+          "Conditions": ["PrecisionParticleMatch.esp:0x80A"],
           "WeaponTypes": [
             "OneHandSword",
             "TwoHandSword",
@@ -404,6 +411,7 @@
       "OverrideMerge": false,
       "Filters": {
         "HitContext": {
+          "Conditions": ["PrecisionParticleMatch.esp:0x80A"],
           "WeaponTypes": [
             "OneHandSword",
             "TwoHandSword",
@@ -447,6 +455,7 @@
       "OverrideMerge": false,
       "Filters": {
         "HitContext": {
+          "Conditions": ["PrecisionParticleMatch.esp:0x80A"],
           "WeaponTypes": [
             "OneHandSword",
             "TwoHandSword",

@@ -6,7 +6,7 @@ EffectNames = ["Bound", "FX"]
 [TrailDefinition.Visuals]
 LifetimeMult = 1.0
 BaseColorOverride = { r = 0.59, g = 0.24, b = 1, a = 1.0 }
-BaseColorScaleMult = 1.18566299
+BaseColorScaleMult = 2.60000000
 TrailMeshOverride = "Effects/WeaponTrails/ElementalDesert/Bound.nif"
 
 [[TrailDefinition]]
@@ -19,7 +19,7 @@ EffectKeywords = ["MagicTurnUndead"]
 [TrailDefinition.Visuals]
 LifetimeMult = 1.0
 BaseColorOverride = { r = 1, g = 0.72, b = 0.19, a = 1.0 }
-BaseColorScaleMult = 0.59067374
+BaseColorScaleMult = 2.60000000
 TrailMeshOverride = "Effects/WeaponTrails/ElementalDesert/Sun.nif"
 
 [[TrailDefinition]]
@@ -29,7 +29,7 @@ EffectShaders = [{ FormID = 382470, Plugin = "Skyrim.esm" }]
 [TrailDefinition.Visuals]
 LifetimeMult = 1.0
 BaseColorOverride = { r = 0.32, g = 1, b = 0.12, a = 1.0 }
-BaseColorScaleMult = 0.55290594
+BaseColorScaleMult = 2.60000000
 TrailMeshOverride = "Effects/WeaponTrails/ElementalDesert/Green.nif"
 
 [[TrailDefinition]]
@@ -39,7 +39,7 @@ EffectShaders = [{ FormID = 382471, Plugin = "Skyrim.esm" }]
 [TrailDefinition.Visuals]
 LifetimeMult = 1.0
 BaseColorOverride = { r = 0.63, g = 0.16, b = 1, a = 1.0 }
-BaseColorScaleMult = 1.36582962
+BaseColorScaleMult = 2.60000000
 TrailMeshOverride = "Effects/WeaponTrails/ElementalDesert/Purple.nif"
 
 [[TrailDefinition]]
@@ -49,7 +49,7 @@ EffectShaders = [{ FormID = 382472, Plugin = "Skyrim.esm" }]
 [TrailDefinition.Visuals]
 LifetimeMult = 1.0
 BaseColorOverride = { r = 0.15, g = 0.4, b = 1, a = 1.0 }
-BaseColorScaleMult = 1.12218776
+BaseColorScaleMult = 2.60000000
 TrailMeshOverride = "Effects/WeaponTrails/ElementalDesert/Blue.nif"
 
 [[TrailDefinition]]
@@ -59,7 +59,7 @@ EffectShaders = [{ FormID = 882273, Plugin = "Skyrim.esm" }]
 [TrailDefinition.Visuals]
 LifetimeMult = 1.0
 BaseColorOverride = { r = 1, g = 0.065, b = 0.12, a = 1.0 }
-BaseColorScaleMult = 1.63525949
+BaseColorScaleMult = 2.60000000
 TrailMeshOverride = "Effects/WeaponTrails/ElementalDesert/Red.nif"
 
 [[TrailDefinition]]
@@ -70,7 +70,7 @@ EffectShaders = [{ FormID = 321552, Plugin = "Skyrim.esm" }]
 [TrailDefinition.Visuals]
 LifetimeMult = 1.0
 BaseColorOverride = { r = 1, g = 0.3, b = 0.055, a = 1.0 }
-BaseColorScaleMult = 1.01557067
+BaseColorScaleMult = 2.60000000
 TrailMeshOverride = "Effects/WeaponTrails/ElementalDesert/Fire.nif"
 
 [[TrailDefinition]]
@@ -81,7 +81,7 @@ EffectShaders = [{ FormID = 326173, Plugin = "Skyrim.esm" }]
 [TrailDefinition.Visuals]
 LifetimeMult = 1.0
 BaseColorOverride = { r = 0.34, g = 0.76, b = 1, a = 1.0 }
-BaseColorScaleMult = 0.63636786
+BaseColorScaleMult = 2.60000000
 TrailMeshOverride = "Effects/WeaponTrails/ElementalDesert/Frost.nif"
 
 [[TrailDefinition]]
@@ -92,5 +92,5 @@ EffectShaders = [{ FormID = 368346, Plugin = "Skyrim.esm" }]
 [TrailDefinition.Visuals]
 LifetimeMult = 1.0
 BaseColorOverride = { r = 0.48, g = 0.58, b = 1, a = 1.0 }
-BaseColorScaleMult = 0.74328766
+BaseColorScaleMult = 2.60000000
 TrailMeshOverride = "Effects/WeaponTrails/ElementalDesert/Shock.nif"
