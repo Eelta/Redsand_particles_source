@@ -162,18 +162,19 @@ try {
     $anchor = "`t`t`t`t`teffectShaderMaterial->baseColorScale *= Settings::fTrailBaseColorScaleMult;"
     $cpp = Replace-One $cpp $anchor ((Text (Join-Path $PSScriptRoot 'source/ParticleBrightness.inc')) + $anchor)
     $anchor = "`t`tstd::string trailMeshPath = Settings::attackTrailMeshPath;"
-    $cpp = Replace-One $cpp $anchor ((Text (Join-Path $PSScriptRoot 'source/TrailActorStyle.inc')) + $anchor)
-    # Skip particle definitions for the legacy ribbon actor before evaluating either list.
+    $defaultMesh = "`t`tstd::string trailMeshPath = redsandLegacyTrail ? Settings::attackTrailMeshPath : `"Effects/WeaponTrails/ElementalDesert/DefaultYellow.nif`";"
+    $cpp = Replace-One $cpp $anchor ((Text (Join-Path $PSScriptRoot 'source/TrailActorStyle.inc')) + $defaultMesh)
+    # Each actor searches only the definitions for its selected trail style.
     foreach ($list in @('All', 'Any')) {
         $anchor = "auto search$list = std::find_if(Settings::trailDefinitions$list.begin(), Settings::trailDefinitions$list.end(), [&](const TrailDefinition& a_trailDefinition) {"
-        $guard = "`n`t`tif (redsandLegacyTrail && a_trailDefinition.trailOverride.meshOverride && a_trailDefinition.trailOverride.meshOverride->starts_with(`"Effects/WeaponTrails/ElementalDesert/`")) {`n`t`t`treturn false;`n`t`t}"
+        $guard = "`n`t`tconst bool particleDefinition = a_trailDefinition.trailOverride.meshOverride && a_trailDefinition.trailOverride.meshOverride->starts_with(`"Effects/WeaponTrails/ElementalDesert/`");`n`t`tif (particleDefinition == redsandLegacyTrail) {`n`t`t`treturn false;`n`t`t}"
         $cpp = Replace-One $cpp $anchor ($anchor + $guard)
     }
-    # Preserve the supplied ribbon preset's 1-second lifetime/fade and 2.6 brightness.
-    foreach ($setting in @(@('fTrailSegmentLifetime', 3, '1.f'), @('fTrailFadeOutTime', 4, '1.f'), @('fTrailBaseColorScaleMult', 1, '2.6f'))) {
+    # Ribbon actors retain their installed Precision settings; particles are independent.
+    foreach ($setting in @(@('fTrailSegmentLifetime', 3, '0.24f'), @('fTrailFadeOutTime', 4, '4.f'), @('fTrailBaseColorScaleMult', 1, '5.4f'))) {
         $needle = 'Settings::' + $setting[0]
         if ([regex]::Matches($cpp, [regex]::Escape($needle)).Count -ne $setting[1]) { throw 'Upstream trail settings changed. Review the ribbon compatibility patch.' }
-        $cpp = $cpp.Replace($needle, "(redsandLegacyTrail ? $($setting[2]) : $needle)")
+        $cpp = $cpp.Replace($needle, "(redsandLegacyTrail ? $needle : $($setting[2]))")
     }
     $anchor = "`t`ttrailParticle = RE::NiPointer<RE::BSTempEffectParticle>(RE::BSTempEffectParticle::Spawn("
     $cpp = Replace-One $cpp $anchor ((Text (Join-Path $PSScriptRoot 'source/TrailDensity.inc')) + $anchor)
