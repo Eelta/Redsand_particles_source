@@ -1,12 +1,12 @@
 # Redsand_particles
 
-Glowing weapon-trail and impact particles with independent fading.
+Glowing weapon-trail particles with independent fading.
 
 ## Install
 
-Install `Redsand_particles.zip` once with your mod manager. Requires Precision, Core Impact Framework, and their SKSE and Address Library dependencies.
+Install `Redsand_particles.zip` once with your mod manager. Requires Precision and its SKSE and Address Library dependencies.
 
-The package includes the modified DLL, particle assets, impact mapping and plugin. SE and AE are enabled; VR is disabled. Runtime checks follow upstream Precision.
+The package includes the modified DLL, particle assets and plugin. SE and AE are enabled; VR is disabled. Runtime checks follow upstream Precision.
 
 ## Build
 
