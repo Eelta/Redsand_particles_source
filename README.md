@@ -29,5 +29,3 @@ Adjust NIF emission rate for density, lifetime for trail persistence, and the co
 ## Licenses
 
 Modified Precision code remains subject to GPL-3.0 and the retained upstream exceptions. Third-party components and assets retain their respective licenses, included in `licenses/` and in the generated package. Kenney particle textures use CC0.
-
-When distributing a DLL, provide its corresponding source and build scripts. A script that fetches the latest upstream HEAD alone does not preserve the source of a released build.
