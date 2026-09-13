@@ -187,11 +187,20 @@ try {
     Save $cppPath $cpp
     Save $headerPath $header
     Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'source/RedsandDrainState.h') -Destination (Join-Path $src 'RedsandDrainState.h') -Force
+    # SE's native hkbCharacterData layout differs from CommonLib 7.0.0's declaration.
+    # Keep the original AE path; the SE offset is verified against 1.5.97 reflection data.
+    $hooksPath = Join-Path $src 'Hooks.cpp'
+    $hooks = Text $hooksPath
+    $hooks = Replace-One $hooks '#include "Hooks.h"' "#include `"Hooks.h`"`n#include `"RedsandHavokLayout.h`""
+    $anchor = "`t`t`t`t`tif (character->footIkDriver && character->setup && character->setup->data && character->setup->data->footIkDriverInfo) {"
+    $hooks = Replace-One $hooks $anchor ((Text (Join-Path $PSScriptRoot 'source/HavokFootIK.inc')).TrimEnd("`n"))
+    Save $hooksPath $hooks
+    Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'source/RedsandHavokLayout.h') -Destination (Join-Path $src 'RedsandHavokLayout.h') -Force
     $mainPath = Join-Path $src 'main.cpp'
     $main = Text $mainPath
     $main = [regex]::Replace($main, '(?m)^\s*REL::Module::reset\(\);[^\n]*\n', '')
     $anchor = 'logger::info("{} v{}"sv, Plugin::NAME, Plugin::VERSION.string());'
-    $main = Replace-One $main $anchor ($anchor + "`n`tlogger::info(`"Redsand independent particle drain v1 enabled; tagged particle trails only`");")
+    $main = Replace-One $main $anchor ($anchor + "`n`tlogger::info(`"Redsand independent particle drain v1 enabled; tagged particle trails only`");`n`tlogger::info(`"Redsand SE Havok foot IK layout fix v1 included`");")
     Save $mainPath $main
     Write-Host 'Building the modified Precision DLL.'
     $build = Join-Path $precision 'build-release'
@@ -225,7 +234,7 @@ try {
     $hashStream = [IO.File]::OpenRead($dll)
     try { $dllHash = [BitConverter]::ToString($hashAlgorithm.ComputeHash($hashStream)).Replace('-', '') }
     finally { $hashStream.Dispose(); $hashAlgorithm.Dispose() }
-    $provenance = [ordered]@{ precisionRepository=$config.precisionRepository; precisionVersion=[Diagnostics.FileVersionInfo]::GetVersionInfo($dll).FileVersion; precisionCommit=(& git -C $precision rev-parse HEAD); commonLibRepository=$config.commonLibRepository; commonLibCommit=(& git -C $commonlib rev-parse HEAD); dllSHA256=$dllHash; particleRate=1600; runtimePolicy='Upstream Precision'; buildUtc=[DateTime]::UtcNow.ToString('o') }
+    $provenance = [ordered]@{ precisionRepository=$config.precisionRepository; precisionVersion=[Diagnostics.FileVersionInfo]::GetVersionInfo($dll).FileVersion; precisionCommit=(& git -C $precision rev-parse HEAD); commonLibRepository=$config.commonLibRepository; commonLibCommit=(& git -C $commonlib rev-parse HEAD); dllSHA256=$dllHash; particleRate=1600; seHavokFootIKLayoutFix=1; runtimePolicy='Upstream Precision'; buildUtc=[DateTime]::UtcNow.ToString('o') }
     Save (Join-Path $stage 'BUILD.json') ($provenance | ConvertTo-Json)
     Add-Type -AssemblyName System.IO.Compression.FileSystem
     $archive = Join-Path $output 'Redsand_particles.zip'
