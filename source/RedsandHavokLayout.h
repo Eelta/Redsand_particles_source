@@ -6,19 +6,21 @@
 
 namespace RedsandHavokLayout
 {
-	// Skyrim 1.5.97's hkbCharacterData reflection table places
-	// characterPropertyValues at 0x80 and footIkDriverInfo at 0x88.
-	// CommonLibSSE-NG 7.0.0 incorrectly declares footIkDriverInfo at 0x80.
-	// Read only the pointer we need, without changing the dependency's ABI.
-	inline constexpr std::size_t seFootIkDriverInfoOffset = 0x88;
+	// hkbCharacterData::footIkDriverInfo is at 0x88 for both SE and AE.
+	// Verified against SE 1.5.97 reflection and the shipped Precision 2.0.6
+	// DLL's shared SE/AE hit-physics code; see docs/foot-ik-fix.md.
+	// The pinned CommonLib revision incorrectly declares it at 0x80, which
+	// actually holds characterPropertyValues. Do not fall back to that member
+	// on AE. Read only this pointer without changing the dependency's ABI.
+	inline constexpr std::size_t footIkDriverInfoOffset = 0x88;
 
-	inline bool HasSEFootIKDriverInfo(const void* characterData)
+	inline bool HasFootIKDriverInfo(const void* characterData)
 	{
 		if (!characterData) {
 			return false;
 		}
 		std::uintptr_t pointer = 0;
-		std::memcpy(&pointer, static_cast<const std::byte*>(characterData) + seFootIkDriverInfoOffset, sizeof(pointer));
+		std::memcpy(&pointer, static_cast<const std::byte*>(characterData) + footIkDriverInfoOffset, sizeof(pointer));
 		return pointer != 0;
 	}
 }

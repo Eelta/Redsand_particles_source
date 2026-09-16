@@ -8,11 +8,13 @@ Install `Redsand_particles.zip` once with your mod manager. Requires Precision a
 
 The package includes the modified DLL, particle assets and plugin. SE and AE are enabled; VR is disabled. Runtime checks follow upstream Precision.
 
+Foot IK fix v2 reads the native `hkbCharacterData::footIkDriverInfo` at `0x88` on both SE and AE, matching the original Precision 2.0.6 binary. Earlier Redsand fixes applied only to SE and still read the wrong member on AE. See [diagnosis and retest steps](docs/foot-ik-fix.md). In MO2, ensure this DLL wins any conflict with an older `Draugr Hit Reaction Fix` or `Precision.dll` replacer. SE/AE in-game retesting of v2 is still required.
+
 ## Build
 
 Requires Windows x64, Git, Visual Studio 2022 with C++ tools, Windows SDK, CMake, 7-Zip and internet access.
 
-Run `BUILD.cmd` to fetch the latest Precision source, apply changes, build and test the DLL, and create `output/Redsand_particles.zip`.
+Run `BUILD.cmd` to fetch the pinned Precision source and CommonLib revision from `build.json`, apply changes, build and test the DLL, and create `output/Redsand_particles.zip`.
 
 Successful builds remove `.build`; failed builds retain it for inspection. `BUILD.json` records source commits and the DLL checksum.
 

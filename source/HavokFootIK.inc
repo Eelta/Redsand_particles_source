@@ -1,5 +1,3 @@
 					const auto* characterData = character->setup ? character->setup->data.get() : nullptr;
-					const bool hasFootIKInfo = characterData &&
-						(REL::Module::IsSE() ? RedsandHavokLayout::HasSEFootIKDriverInfo(characterData) :
-						                     characterData->footIkDriverInfo.get() != nullptr);
+					const bool hasFootIKInfo = RedsandHavokLayout::HasFootIKDriverInfo(characterData);
 					if (character->footIkDriver && hasFootIKInfo) {
