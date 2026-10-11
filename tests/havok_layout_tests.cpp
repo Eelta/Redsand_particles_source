@@ -8,8 +8,6 @@ void check(bool condition, const char* message)
 	if (!condition) throw std::runtime_error(message);
 }
 
-// Model the pinned CommonLib declaration, including its incorrectly named
-// member at 0x80. Native bytes at 0x88 must determine the result instead.
 template <class T>
 struct Pointer
 {
@@ -22,8 +20,8 @@ struct Pointer
 struct LegacyCharacterData
 {
 	std::array<std::byte, 0x80> prefix{};
-	Pointer<void> footIkDriverInfo;  // actually native characterPropertyValues
-	Pointer<void> handIkDriverInfo;  // actually native footIkDriverInfo
+	Pointer<void> footIkDriverInfo;
+	Pointer<void> handIkDriverInfo;
 	std::array<std::byte, 0x20> suffix{};
 };
 static_assert(offsetof(LegacyCharacterData, footIkDriverInfo) == 0x80);
@@ -32,8 +30,6 @@ static_assert(offsetof(LegacyCharacterData, handIkDriverInfo) == 0x88);
 struct Setup { Pointer<LegacyCharacterData> data; };
 struct Character { Pointer<Setup> setup; void* footIkDriver{}; };
 
-// Retain both runtime cases so reintroducing the former SE-only conditional
-// in the actual build fragment fails the AE regression case below.
 namespace REL
 {
 	struct Module
@@ -54,8 +50,7 @@ bool HookWouldCopyPose(const Character* character)
 int main() try
 {
 	static_assert(sizeof(std::uintptr_t) == 8, "Skyrim requires a 64-bit build");
-	// Independent fixture offsets from SkyrimSE.exe 1.5.97's Havok reflection
-	// records; deliberately do not use the implementation's offset constant.
+
 	std::array<std::byte, 0xB0> characterData{};
 	const std::uintptr_t propertyValues = 0x1122334455667788;
 	const std::uintptr_t footIKInfo = 0x8877665544332211;

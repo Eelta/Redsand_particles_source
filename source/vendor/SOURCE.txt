@@ -1,0 +1,24 @@
+SKSE Menu Framework minimal C ABI adapter
+
+Upstream: https://github.com/QTR-Modding/SKSE-Menu-Framework-3-API
+Commit: 1dcb70179076aae4ab626f43c5baab2735ca5877
+Original file: SKSEMenuFramework.h
+License: GNU Lesser General Public License, version 2.1 (LICENSE)
+
+This adapter contains only the C export declarations used by Redsand Particles
+and checked dynamic symbol loading. It has no ImGui implementation or hard DLL
+link. Modified 2026-10-10: reduced API to the required functions, wrapped in a
+Redsand namespace, and added complete export validation before registration.
+
+The signatures were also checked against SKSE Menu Framework 2:
+https://github.com/Thiago099/SKSE-Menu-Framework-2
+Commit: ca7b2457d5023c610ebe8de05e960f9cacf5e1a8
+include/SKSEMenuFramework.h: AddSectionItem
+include/WindowManager.h: __stdcall RenderFunction
+include/cimgui.h: igCheckbox, igSliderFloat, igSmallButton,
+                 igTextUnformatted, igSeparator, igIsItemDeactivatedAfterEdit
+
+The framework runtime DLL must be installed separately by the player.
+
+SHA-256 of the original SKSEMenuFramework.h at the pinned v3 commit:
+48416e8220ca777e2fffc2ef2baf21f699ab2e6c409d437f44eec5e311c3524c

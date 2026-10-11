@@ -7,6 +7,13 @@ struct RedsandDrainState
 {
 	float elapsed = 0.f;
 
+	bool BeginDrain()
+	{
+		if (emissionStopped) { return false; }
+		emissionStopped = true;
+		return true;
+	}
+
 	void Advance(float delta)
 	{
 		if (std::isfinite(delta) && delta > 0.f) {
@@ -19,4 +26,7 @@ struct RedsandDrainState
 	{
 		return (elapsed >= 0.1f && liveParticles == 0) || SafetyAlpha() == 0.f;
 	}
+
+private:
+	bool emissionStopped = false;
 };

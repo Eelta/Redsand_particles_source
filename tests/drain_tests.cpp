@@ -12,9 +12,12 @@ void check(bool condition, const char* message)
 int main()
 {
 	RedsandDrainState first;
+	check(first.BeginDrain(), "first trail did not stop emission on entry");
 	first.Advance(1.f);
 	RedsandDrainState second;
+	check(second.BeginDrain(), "new trail inherited an old emission stop");
 	second.Advance(0.25f);
+	check(!first.BeginDrain() && !second.BeginDrain(), "drain repeated emitter shutdown");
 	check(first.elapsed == 1.f, "new attack reset old attack clock");
 	check(!first.CanRetire(1), "retired visible live particle");
 	check(first.CanRetire(0), "empty trail retained");
@@ -32,9 +35,15 @@ int main()
 	check(stalled.SafetyAlpha() == 0.f && stalled.CanRetire(100), "stalled trail leaked");
 	std::vector<RedsandDrainState> trails;
 	std::size_t peak = 0;
+	std::size_t emissionStops = 0;
+	std::size_t drainUpdates = 0;
 	for (int frame = 0; frame < 10500; ++frame) {
 		if (frame < 10000 && frame % 10 == 0) trails.emplace_back();
-		for (auto& trail : trails) trail.Advance(0.01f);
+		for (auto& trail : trails) {
+			if (trail.BeginDrain()) { ++emissionStops; }
+			++drainUpdates;
+			trail.Advance(0.01f);
+		}
 		std::erase_if(trails, [](const auto& trail) {
 			const auto live = trail.elapsed < 3.3f ? 100u : 0u;
 			check(live == 0 || !trail.CanRetire(live), "combo retired surviving particles");
@@ -44,5 +53,7 @@ int main()
 	}
 	check(peak <= 34, "combo retained unbounded instances");
 	check(trails.empty(), "trails remained after attacks stopped");
-	std::cout << "PASS: independent clocks, graceful retirement, bounded fallback, 1000-attack lifecycle simulation\n";
+	check(emissionStops == 1000, "emission shutdown was skipped or repeated during rapid attacks");
+	check(drainUpdates > 300000, "drain updates stopped after emitter shutdown");
+	std::cout << "PASS: one emission shutdown per trail, independent clocks, graceful retirement, bounded fallback, 1000-attack lifecycle simulation\n";
 }

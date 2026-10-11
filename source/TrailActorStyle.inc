@@ -1,5 +1,8 @@
-		// Actors excluded by the particle scope use the original Precision ribbon trails.
-		static auto* scope = RE::TESDataHandler::GetSingleton()->LookupForm<RE::BGSPerk>(0x80A, "PrecisionParticleMatch.esp");
-		if (auto actor = a_actorHandle.get(); actor && scope) {
-			redsandLegacyTrail = !scope->perkConditions.IsTrue(actor.get(), nullptr);
-		}
+redsandConfig = RedsandSettings::Get();
+		auto* redsandWeapon = a_weaponItem && a_weaponItem->object ? a_weaponItem->object->As<RE::TESObjectWEAP>() : nullptr;
+		redsandWeaponProfile = Redsand::Weapons::ForWeapon(redsandWeapon);
+		const bool redsandStaff = redsandWeapon && redsandWeapon->GetWeaponType() == RE::WEAPON_TYPE::kStaff;
+		const auto redsandActor = a_actorHandle.get();
+		redsandActorIsPlayer = redsandActor && redsandActor->IsPlayerRef();
+		redsandScopeAllowed = redsandActor && Redsand::Weapons::MeleeScopeAllowed(redsandConfig, redsandActorIsPlayer, redsandStaff);
+		redsandLegacyTrail = !redsandScopeAllowed;

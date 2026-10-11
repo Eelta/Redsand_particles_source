@@ -1,4 +1,4 @@
-param([string]$WorkRoot = (Join-Path $PSScriptRoot '.build'))
+﻿param([string]$WorkRoot = (Join-Path $PSScriptRoot '.build'), [switch]$KeepWork, [switch]$PrepareOnly)
 $ErrorActionPreference = 'Stop'
 $env:VSLANG = '1033'
 $env:DOTNET_CLI_UI_LANGUAGE = 'en-US'
@@ -151,28 +151,46 @@ try {
     Run $powerShellExe @('-NoLogo', '-NoProfile', '-NonInteractive', '-Command', 'if ($PSVersionTable.PSVersion.Major -lt 7) { exit 1 }')
     $env:PATH = (Split-Path -Parent $powerShellExe) + ';' + $env:PATH
     $env:CommonLibSSEPath = $commonlib
+    if ($PrepareOnly) {
+        Write-Host 'Managed dependencies prepared. Native source and release package were not changed.'
+        exit 0
+    }
     $src = Join-Path $precision 'src'
+
+    foreach ($retired in @('RedsandStaffCasting.h', 'RedsandStaffCasting.cpp', 'RedsandStaffCastPolicy.h', 'RedsandStaffProjectileSource.h')) {
+        $retiredPath = [IO.Path]::GetFullPath((Join-Path $src $retired))
+        if (!$retiredPath.StartsWith($precision.TrimEnd('\') + '\src\', [StringComparison]::OrdinalIgnoreCase)) { throw 'Retired source escaped managed checkout.' }
+        if (Test-Path -LiteralPath $retiredPath) {
+            $retiredItem = Get-Item -LiteralPath $retiredPath -Force
+            if ($retiredItem.PSIsContainer -or ($retiredItem.Attributes -band [IO.FileAttributes]::ReparsePoint)) { throw 'Unexpected retired source path.' }
+            Remove-Item -LiteralPath $retiredPath -Force
+        }
+    }
     $cppPath = Join-Path $src 'AttackTrail.cpp'
     $headerPath = Join-Path $src 'AttackTrail.h'
     $cpp = Text $cppPath
     $header = Text $headerPath
     if ($cpp.Contains('UpdateRedsandParticles')) { throw 'Unexpected pre-patched Precision checkout.' }
-    $includes = "#include `"RE/N/NiParticleSystem.h`"`n#include `"RE/N/NiPSysModifier.h`"`n#include `"RE/N/NiParticlesData.h`"`n#include `"RE/N/NiPSysData.h`"`n"
+    $includes = "#include `"RE/N/NiParticleSystem.h`"`n#include `"RE/N/NiPSysModifier.h`"`n#include `"RE/N/NiParticlesData.h`"`n#include `"RE/N/NiPSysData.h`"`n#include `"RE/N/NiInterpController.h`"`n#include `"RE/N/NiFloatInterpolator.h`"`n#include `"RE/N/NiFloatData.h`"`n#include `"RE/N/NiSourceTexture.h`"`n#include <atomic>`n#include <limits>`n"
     $cpp = Replace-One $cpp '#include "AttackTrail.h"' ("#include `"AttackTrail.h`"`n" + $includes)
+    $anchor = "`t`t`tif (a_init) {"
+    $cpp = Replace-One $cpp $anchor ("`t`t`tbool redsandMaterialCopied = false;`n" + $anchor)
     $anchor = "`t`t`t`t`teffectShader->SetMaterial(newMaterial, false);"
     $cpp = Replace-One $cpp $anchor ((Text (Join-Path $PSScriptRoot 'source/ParticleMaterial.inc')).TrimEnd("`n"))
     $anchor = "`t`t`t`t`teffectShaderMaterial->baseColorScale *= Settings::fTrailBaseColorScaleMult;"
     $cpp = Replace-One $cpp $anchor ((Text (Join-Path $PSScriptRoot 'source/ParticleBrightness.inc')) + $anchor)
+    $anchor = "`t`t`tif (a_bExpired) {  // fade out alpha"
+    $cpp = Replace-One $cpp $anchor ((Text (Join-Path $PSScriptRoot 'source/ParticleLiveBrightness.inc')) + $anchor)
     $anchor = "`t`tstd::string trailMeshPath = Settings::attackTrailMeshPath;"
     $defaultMesh = "`t`tstd::string trailMeshPath = redsandLegacyTrail ? Settings::attackTrailMeshPath : `"Effects/WeaponTrails/ElementalDesert/DefaultYellow.nif`";"
     $cpp = Replace-One $cpp $anchor ((Text (Join-Path $PSScriptRoot 'source/TrailActorStyle.inc')) + $defaultMesh)
-    # Each actor searches only the definitions for its selected trail style.
+
     foreach ($list in @('All', 'Any')) {
         $anchor = "auto search$list = std::find_if(Settings::trailDefinitions$list.begin(), Settings::trailDefinitions$list.end(), [&](const TrailDefinition& a_trailDefinition) {"
         $guard = "`n`t`tconst bool particleDefinition = a_trailDefinition.trailOverride.meshOverride && a_trailDefinition.trailOverride.meshOverride->starts_with(`"Effects/WeaponTrails/ElementalDesert/`");`n`t`tif (particleDefinition == redsandLegacyTrail) {`n`t`t`treturn false;`n`t`t}"
         $cpp = Replace-One $cpp $anchor ($anchor + $guard)
     }
-    # Ribbon actors retain their installed Precision settings; particles are independent.
+
     foreach ($setting in @(@('fTrailSegmentLifetime', 3, '0.24f'), @('fTrailFadeOutTime', 4, '4.f'), @('fTrailBaseColorScaleMult', 1, '5.4f'))) {
         $needle = 'Settings::' + $setting[0]
         if ([regex]::Matches($cpp, [regex]::Escape($needle)).Count -ne $setting[1]) { throw 'Upstream trail settings changed. Review the ribbon compatibility patch.' }
@@ -182,32 +200,75 @@ try {
     $cpp = Replace-One $cpp $anchor ((Text (Join-Path $PSScriptRoot 'source/TrailDensity.inc')) + $anchor)
     $anchor = "`t`tconstexpr RE::NiPoint3 forwardVector{ 1.f, 0.f, 0.f };"
     $cpp = Replace-One $cpp $anchor ((Text (Join-Path $PSScriptRoot 'source/TrailUpdate.inc')) + $anchor)
+    $anchor = 'if (!bAppliedTrailColorSettings || bExpired) {'
+    $cpp = Replace-One $cpp $anchor 'if (!bAppliedTrailColorSettings || bExpired || redsandManaged) {'
+    $anchor = "`t`tcurrentTime += a_deltaTime;"
+    $cpp = Replace-One $cpp $anchor ("`t`tUpdateRedsandEmission();`n" + $anchor)
     $anchor = 'bool AttackTrail::GetTrailDefinition('
-    $cpp = Replace-One $cpp $anchor ((Text (Join-Path $PSScriptRoot 'source/ParticleDrain.cpp.inc')) + $anchor)
-    $header = Replace-One $header '#include "Settings.h"' "#include `"Settings.h`"`n#include `"RedsandDrainState.h`""
+    $cpp = Replace-One $cpp $anchor ((Text (Join-Path $PSScriptRoot 'source/ParticleDrain.cpp.inc')) + (Text (Join-Path $PSScriptRoot 'source/ParticleDiagnostics.cpp.inc')) + (Text (Join-Path $PSScriptRoot 'source/SwordRuntime.inc')) + $anchor)
+    $header = Replace-One $header '#include "Settings.h"' "#include `"Settings.h`"`n#include `"RedsandDrainState.h`"`n#include `"RedsandSettings.h`"`n#include `"RedsandLog.h`"`n#include `"RedsandMeleeStyle.h`"`n#include `"RedsandEmissionTuning.h`"`n#include `"RE/N/NiPSysGravityModifier.h`"`n#include `"RE/N/NiFloatInterpolator.h`""
     $header = Replace-One $header "private:`n" ("private:`n" + (Text (Join-Path $PSScriptRoot 'source/TrailMembers.inc')))
     Save $cppPath $cpp
     Save $headerPath $header
-    Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'source/RedsandDrainState.h') -Destination (Join-Path $src 'RedsandDrainState.h') -Force
-    # Both SE and AE need the native 0x88 member, as in the shipped Precision 2.0.6 DLL.
-    # The pinned CommonLib declaration at 0x80 refers to characterPropertyValues.
+
     $hooksPath = Join-Path $src 'Hooks.cpp'
     $hooks = Text $hooksPath
-    $hooks = Replace-One $hooks '#include "Hooks.h"' "#include `"Hooks.h`"`n#include `"RedsandHavokLayout.h`""
+    $hooks = Replace-One $hooks '#include "Hooks.h"' "#include `"Hooks.h`"`n#include `"RedsandBowParticles.h`"`n#include `"RedsandSettings.h`"`n#include `"RedsandLog.h`"`n#include `"RedsandHavokLayout.h`""
     $anchor = "`t`t`t`t`tif (character->footIkDriver && character->setup && character->setup->data && character->setup->data->footIkDriverInfo) {"
     $hooks = Replace-One $hooks $anchor ((Text (Join-Path $PSScriptRoot 'source/HavokFootIK.inc')).TrimEnd("`n"))
+    $anchor = "`t`tPrecisionHandler::GetSingleton()->Update(*g_deltaTime);"
+    $hooks = Replace-One $hooks $anchor ($anchor + "`n`t`tRedsandBowParticles::Update(*g_deltaTime);`n`t`tRedsandSettings::TickPendingSave();`n`t`tRedsandLog::Sync();")
     Save $hooksPath $hooks
-    Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'source/RedsandHavokLayout.h') -Destination (Join-Path $src 'RedsandHavokLayout.h') -Force
     $mainPath = Join-Path $src 'main.cpp'
     $main = Text $mainPath
+    $main = Replace-One $main '#include "Events.h"' "#include `"Events.h`"`n#include `"RedsandBowParticles.h`"`n#include `"RedsandSettings.h`"`n#include `"RedsandLog.h`"`n#include `"RedsandMenu.h`""
+    $anchor = "`tcase SKSE::MessagingInterface::kPostLoad:`n`t`tbreak;"
+    $main = Replace-One $main $anchor "`tcase SKSE::MessagingInterface::kPostLoad:`n`t`tRedsandSettings::Load();`n`t`tRedsandLog::Initialize();`n`t`tRedsandLog::info(`"Redsand Particles $($config.packageVersion): material isolation, independent drain and Havok foot IK fix; runtime={}`", REL::Module::get().version().string());`n`t`tRedsandMenu::Register();`n`t`tbreak;"
+    foreach ($anchor in @("`t`tPrecisionHandler::GetSingleton()->Initialize();", "`t`tSettings::OnPostLoadGame();")) {
+        $main = Replace-One $main $anchor ($anchor + "`n`t`tRedsandBowParticles::SetEnabled(true);")
+    }
+    $anchor = "`t`tPrecisionHandler::GetSingleton()->OnPreLoadGame();"
+    $main = Replace-One $main $anchor ("`t`tRedsandSettings::FlushPendingSave();`n`t`tRedsandBowParticles::SetEnabled(false);`n" + $anchor)
+    $anchor = "`tHooks::Install();"
+    $main = Replace-One $main $anchor ($anchor + "`n`tRedsandBowParticles::Install();")
+    $nativeFiles = @(
+        'RedsandDrainState.h', 'RedsandHavokLayout.h',
+        'RedsandBowParticles.h', 'RedsandBowParticles.cpp', 'RedsandBowSimulation.h',
+        'RedsandBowChargeState.h', 'RedsandBowEventState.h', 'RedsandBowStreamBudget.h',
+        'BowGraphSnapshot.inc', 'BowArrowProcessing.inc', 'BowRenderer.inc', 'BowMotionDiagnostics.inc', 'RedsandMotionTrace.h',
+        'RedsandSettings.h', 'RedsandSettings.cpp', 'RedsandLog.h', 'RedsandLog.cpp', 'RedsandMenu.h', 'RedsandMenu.cpp',
+        'RedsandWeaponProfiles.h', 'RedsandWeaponProfiles.cpp', 'RedsandMeleeStyle.h', 'RedsandEmissionTuning.h'
+    )
+    foreach ($file in $nativeFiles) {
+        Copy-Item -LiteralPath (Join-Path $PSScriptRoot "source/$file") -Destination (Join-Path $src $file) -Force
+    }
+    Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'source/vendor') -Destination $src -Recurse -Force
+    $handlerPath = Join-Path $src 'PrecisionHandler.cpp'
+    $handler = Text $handlerPath
+    $handler = Replace-One $handler '#include "PrecisionHandler.h"' "#include `"PrecisionHandler.h`"`n#include `"RedsandBowParticles.h`""
+    $anchor = "PrecisionHandler::EventResult PrecisionHandler::ProcessEvent(const RE::BSAnimationGraphEvent* a_event, RE::BSTEventSource<RE::BSAnimationGraphEvent>* a_eventSource)`n{"
+    $handler = Replace-One $handler $anchor ($anchor + "`n`tRedsandBowParticles::OnAnimationEvent(a_event, a_eventSource);")
+    Save $handlerPath $handler
     $main = [regex]::Replace($main, '(?m)^\s*REL::Module::reset\(\);[^\n]*\n', '')
-    $anchor = 'logger::info("{} v{}"sv, Plugin::NAME, Plugin::VERSION.string());'
-    $main = Replace-One $main $anchor ($anchor + "`n`tlogger::info(`"Redsand independent particle drain v1 enabled; tagged particle trails only`");`n`tlogger::info(`"Redsand Havok foot IK layout fix v2: SE/AE offset=0x88, runtime={}`", REL::Module::get().version().string());")
-    $main = Replace-One $main $anchor ($anchor + "`n`tlogger::info(`"Redsand particle material isolation v1 enabled; tagged particle trails only`");")
     Save $mainPath $main
+
+    $noticeFile = Join-Path $WorkRoot 'RedsandThirdPartyNotices.txt'
+    $resourceTemplate = Join-Path $precision 'cmake/version.rc.in'
+    Save $resourceTemplate ((Text $resourceTemplate) + "`nREDSAND_THIRD_PARTY_LICENSES RCDATA `"$($noticeFile.Replace('\', '/'))`"`n")
     Write-Host 'Building the modified Precision DLL.'
     $build = Join-Path $precision 'build-release'
     Run 'cmake' @('-S', $precision, '-B', $build, '-G', 'Visual Studio 17 2022', '-A', 'x64', "-DCMAKE_TOOLCHAIN_FILE=$vcpkg/scripts/buildsystems/vcpkg.cmake", '-DVCPKG_TARGET_TRIPLET=x64-windows-static-md', "-DCompiledPluginsPath=$WorkRoot/output", '-DCOPY_OUTPUT=OFF', '-DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreadedDLL', '-DCMAKE_POLICY_VERSION_MINIMUM=3.5', '-DBUILD_TESTS=OFF', '-DENABLE_SKYRIM_SE=ON', '-DENABLE_SKYRIM_AE=ON', '-DENABLE_SKYRIM_VR=OFF', "-DCMAKE_CXX_FLAGS=/MP$($config.jobs) /EHsc /utf-8")
+    $noticeText = "Redsand Particles - Third-party copyright and license notices`n`n"
+    foreach ($license in (Get-ChildItem -LiteralPath (Join-Path $PSScriptRoot 'licenses') -File | Sort-Object Name)) {
+        $noticeText += "===== $($license.Name) =====`n" + (Text $license.FullName) + "`n`n"
+    }
+    $noticeText += "===== glm =====`n" + (Text (Join-Path $precision 'extern/glm/copying.txt')) + "`n`n"
+    $share = Join-Path $build 'vcpkg_installed/x64-windows-static-md/share'
+    foreach ($dependency in (Get-ChildItem -LiteralPath $share -Directory | Sort-Object Name)) {
+        $copyright = Join-Path $dependency.FullName 'copyright'
+        if (Test-Path -LiteralPath $copyright) { $noticeText += "===== $($dependency.Name) =====`n" + (Text $copyright) + "`n`n" }
+    }
+    Save $noticeFile $noticeText
     Run 'cmake' @('--build', $build, '--config', 'Release', '--parallel', "$($config.jobs)")
     $testBuild = Join-Path $WorkRoot 'drain-tests'
     Run 'cmake' @('-S', (Join-Path $PSScriptRoot 'tests'), '-B', $testBuild, '-G', 'Visual Studio 17 2022', '-A', 'x64')
@@ -215,50 +276,121 @@ try {
     Run 'ctest' @('--test-dir', $testBuild, '-C', 'Release', '--output-on-failure')
     $dll = Join-Path $build 'src/Release/Precision.dll'
     if (!(Test-Path -LiteralPath $dll)) { throw 'Precision.dll was not produced.' }
+    if (![Text.Encoding]::UTF8.GetString([IO.File]::ReadAllBytes($dll)).Contains($noticeText)) { throw 'The DLL is missing its embedded license resource.' }
     $stage = Join-Path $WorkRoot ('package-' + [guid]::NewGuid().ToString('N'))
     [IO.Directory]::CreateDirectory($stage) | Out-Null
-    Get-ChildItem -LiteralPath (Join-Path $PSScriptRoot 'assets') | Copy-Item -Destination $stage -Recurse -Force
+
+    $runtimeAssets = Join-Path $PSScriptRoot 'assets/Basic'
+    foreach ($asset in Get-ChildItem -LiteralPath $runtimeAssets -Recurse -File) {
+        $relative = $asset.FullName.Substring($runtimeAssets.Length + 1)
+        if ($relative -ne 'PrecisionParticleMatch.esp' -and $relative -notmatch '^(Meshes[\\/].+\.nif|Textures[\\/].+\.dds|SKSE[\\/].+\.(ini|toml))$') { continue }
+        if ($relative -match '[\\/]Density(5|25|50|75)[\\/]' -or $asset.Name -match '^(LICENSE|COPYING|NOTICE)([. -]|$)') { continue }
+        $target = [IO.Path]::GetFullPath((Join-Path $stage $relative))
+        if (!$target.StartsWith($stage + '\', [StringComparison]::OrdinalIgnoreCase)) { throw 'Runtime asset escaped staging directory.' }
+        [IO.Directory]::CreateDirectory((Split-Path -Parent $target)) | Out-Null
+        Copy-Item -LiteralPath $asset.FullName -Destination $target -Force
+    }
     $plugins = Join-Path $stage 'SKSE/Plugins'
     [IO.Directory]::CreateDirectory($plugins) | Out-Null
     Copy-Item -LiteralPath $dll -Destination (Join-Path $plugins 'Precision.dll') -Force
-    Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'README.md') -Destination (Join-Path $stage 'README.md')
-    Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'docs') -Destination (Join-Path $stage 'docs') -Recurse
-    $licenses = Join-Path $stage 'licenses'
-    [IO.Directory]::CreateDirectory($licenses) | Out-Null
-    foreach ($item in @(@($precision, 'COPYING', 'Precision-COPYING.txt'), @($precision, 'EXCEPTIONS', 'Precision-EXCEPTIONS.txt'), @($commonlib, 'COPYING', 'CommonLibSSE-NG-COPYING.txt'), @($commonlib, 'EXCEPTIONS.md', 'CommonLibSSE-NG-EXCEPTIONS.txt'))) {
-        Copy-Item -LiteralPath (Join-Path $item[0] $item[1]) -Destination (Join-Path $licenses $item[2])
+    $dllHash = (Get-FileHash -LiteralPath $dll -Algorithm SHA256).Hash
+    $sourceHashes = [ordered]@{}
+    $nativeSourceRoot = Join-Path $sourceRoot 'source'
+    foreach ($sourceFile in (Get-ChildItem -LiteralPath $nativeSourceRoot -Recurse -File | Sort-Object FullName)) {
+        $sourceName = $sourceFile.FullName.Substring($nativeSourceRoot.Length + 1).Replace('\', '/')
+        $sourceHashes[$sourceName] = (Get-FileHash -LiteralPath $sourceFile.FullName -Algorithm SHA256).Hash
     }
-    Copy-Item -LiteralPath (Join-Path $precision 'extern/glm/copying.txt') -Destination (Join-Path $licenses 'glm.txt')
-    $share = Join-Path $build 'vcpkg_installed/x64-windows-static-md/share'
-    Get-ChildItem -LiteralPath $share -Directory | ForEach-Object {
-        $copyright = Join-Path $_.FullName 'copyright'
-        if (Test-Path -LiteralPath $copyright) { Copy-Item -LiteralPath $copyright -Destination (Join-Path $licenses ($_.Name + '.txt')) }
+    $provenance = [ordered]@{
+        precisionRepository=$config.precisionRepository
+        precisionVersion=[Diagnostics.FileVersionInfo]::GetVersionInfo($dll).FileVersion
+        precisionCommit=(& git -C $precision rev-parse HEAD)
+        commonLibRepository=$config.commonLibRepository
+        commonLibCommit=(& git -C $commonlib rev-parse HEAD)
+        dllSHA256=$dllHash
+        particleRate=1600
+        havokFootIKLayoutFix=2
+        footIKDriverInfoOffset='0x88'
+        footIKFixRuntimes=@('SE', 'AE')
+        runtimePolicy='Upstream Precision'
+        buildUtc=[DateTime]::UtcNow.ToString('o')
+        particleMaterialIsolationFix=1
+        particleDiagnostics=1
+        diagnosticLoggingDefault=$false
+        independentDiagnosticLog='RedsandParticles.log'
+        diagnosticLogMode='OverwritePerGameSession'
+        diagnosticLogMaxBytes=8388608
+        scopedMeleeMeshSelection=1
+        drainStopsEmissionOnce=$true
+        bowParticles=17
+        bowMotionDiagnostics=2
+        embeddedLicenseNotices=$true
+        licenseNoticesSHA256=(Get-FileHash -LiteralPath $noticeFile -Algorithm SHA256).Hash
+        redsandRealtimeMenu=1
+        skseMenuFrameworkAPI=2
+        swordTipAttachment=2
+        swordTipSweptEmitter=$true
+        swordEmitterObjectTraversal=$true
+        staffParticlesRemoved=$true
+        swordSpreadControl=$true
+        swordSizeControl=$true
+        bilingualMenu=$true
+        defaultMenuLanguage='English'
+        bowRapidFireRecovery=4
+        runtimeParticleSettings=1
+        bowContinuousSamplingRecovery=1
+        vanillaWeaponClassStyles=1
+        modWeaponStyleFallback='Default'
+        weaponStyleProfiles=9
+        weaponShapeTextures=9
+        sourceSHA256=$sourceHashes
+        bowRapidFireStreamRecovery=1
+        bowOrderedReleaseProcessing=1
+        bowRendererInitializationRecovery=1
+        bowCameraSwitchFix=2
+        bowHeldGraphPolling=1
+        bowGraphTraversalCrashFix=1
+        bowRapidComboCompatibility=1
+        bowParticlesOptional=$true
+        bowParticleScope='RuntimeMenu'
+        bowIndependentOfSwordOptions=$true
+        packageType='full'
+        packageFormat='RuntimeFiles'
+        packageVersion=$config.packageVersion
+        requiresPreviousRedsand=$false
+        bowParticleEffects=@('chargeConvergence', 'releaseRing', 'worldSpaceArrowTrail')
     }
-    $hashAlgorithm = [Security.Cryptography.SHA256]::Create()
-    $hashStream = [IO.File]::OpenRead($dll)
-    try { $dllHash = [BitConverter]::ToString($hashAlgorithm.ComputeHash($hashStream)).Replace('-', '') }
-    finally { $hashStream.Dispose(); $hashAlgorithm.Dispose() }
-    $provenance = [ordered]@{ precisionRepository=$config.precisionRepository; precisionVersion=[Diagnostics.FileVersionInfo]::GetVersionInfo($dll).FileVersion; precisionCommit=(& git -C $precision rev-parse HEAD); commonLibRepository=$config.commonLibRepository; commonLibCommit=(& git -C $commonlib rev-parse HEAD); dllSHA256=$dllHash; particleRate=1600; havokFootIKLayoutFix=2; footIKDriverInfoOffset='0x88'; footIKFixRuntimes=@('SE', 'AE'); runtimePolicy='Upstream Precision'; buildUtc=[DateTime]::UtcNow.ToString('o') }
-    $provenance['particleMaterialIsolationFix'] = 1
-    Save (Join-Path $stage 'BUILD.json') ($provenance | ConvertTo-Json)
+    $manifestPath = Join-Path $output 'BUILD.json'
+    Save $manifestPath ($provenance | ConvertTo-Json)
+    & (Join-Path $PSScriptRoot 'tests/package_layout_tests.ps1') -StagePath $stage -AssetsPath (Join-Path $PSScriptRoot 'assets') -ManifestPath $manifestPath
+    Add-Type -AssemblyName System.IO.Compression
     Add-Type -AssemblyName System.IO.Compression.FileSystem
-    $archive = Join-Path $output 'Redsand_particles.zip'
-    $pending = Join-Path $output ('Redsand_particles-' + [guid]::NewGuid().ToString('N') + '.zip')
-    [IO.Compression.ZipFile]::CreateFromDirectory($stage, $pending)
+    $archive = Join-Path $output 'Redsand Particles.zip'
+    $pending = Join-Path $WorkRoot ('package-' + [guid]::NewGuid().ToString('N') + '.zip')
+    $zip = [IO.Compression.ZipFile]::Open($pending, [IO.Compression.ZipArchiveMode]::Create)
+    try {
+
+        foreach ($file in Get-ChildItem -LiteralPath $stage -File -Recurse) {
+            $entryName = $file.FullName.Substring($stage.Length + 1).Replace('\', '/')
+            [IO.Compression.ZipFileExtensions]::CreateEntryFromFile($zip, $file.FullName, $entryName) | Out-Null
+        }
+    } finally { $zip.Dispose() }
     Move-Item -LiteralPath $pending -Destination $archive -Force
-    Copy-Item -LiteralPath (Join-Path $stage 'BUILD.json') -Destination (Join-Path $output 'BUILD.json') -Force
     Write-Host "Created: $archive"
+    if ($KeepWork) {
+        Write-Host 'Build completed. Generated intermediates retained by -KeepWork.'
+        exit 0
+    }
     $resolvedWork = (Resolve-Path -LiteralPath $WorkRoot).ProviderPath.TrimEnd('\')
     if (![string]::Equals($resolvedWork, $workPath, [StringComparison]::OrdinalIgnoreCase) -or [IO.File]::ReadAllText($workspaceMarker) -ne $sourceRoot) {
         throw 'Workspace verification failed. Cleanup was skipped.'
     }
     Write-Host 'Removing generated build intermediates.'
     Remove-Item -LiteralPath $resolvedWork -Recurse -Force -ErrorAction Stop
-    if (Test-Path -LiteralPath $resolvedWork) { throw 'The installer was created, but workspace cleanup did not complete.' }
+    if (Test-Path -LiteralPath $resolvedWork) { throw 'The archive was created, but workspace cleanup did not complete.' }
     Write-Host 'Build completed. Generated intermediates were removed.'
     exit 0
 } catch {
     Write-Host $_.Exception.Message
-    Save (Join-Path $output 'BUILD_ERROR.txt') $_.Exception.ToString()
+    Save (Join-Path $WorkRoot 'BUILD_ERROR.txt') $_.Exception.ToString()
     exit 1
 }

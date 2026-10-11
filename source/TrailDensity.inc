@@ -1,21 +1,29 @@
-		// Leave installed Precision ribbon meshes and colors untouched.
+const auto redsandRequestedMesh = redsandConfig.diagnostics ? trailMeshPath : std::string{};
+		trailMeshPath = Redsand::Weapons::ResolveMeleeMesh(redsandScopeAllowed, trailMeshPath, Settings::attackTrailMeshPath);
 		if (!redsandLegacyTrail && (trailMeshPath == Settings::attackTrailMeshPath || trailMeshPath == "Effects/WeaponTrails/AttackTrailMagic.nif")) {
 			trailMeshPath = "Effects/WeaponTrails/ElementalDesert/DefaultYellow.nif";
 		}
 		if (!redsandLegacyTrail && !baseColorOverride) {
 			baseColorOverride = RE::NiColorA{ 0.025f, 0.080f, 0.650f, 1.f };
 		}
-		// Density ESPs select equivalent particle meshes; original ribbons are exempt.
-		static auto* particleDensity = RE::TESDataHandler::GetSingleton()->LookupForm<RE::TESGlobal>(0x80B, "PrecisionParticleMatch.esp");
-		if (particleDensity && !redsandLegacyTrail) {
-			const float percent = particleDensity->value;
-			if (percent == 75.f || percent == 50.f || percent == 25.f || percent == 5.f) {
-				bool managedMesh = false;
-				for (const auto* color : { "Blue", "Bound", "DefaultYellow", "Fire", "Frost", "Green", "Purple", "Red", "Shock", "Sun" }) {
-					managedMesh = managedMesh || trailMeshPath == std::string("Effects/WeaponTrails/ElementalDesert/") + color + ".nif";
-				}
-				if (managedMesh) {
-					trailMeshPath.insert(trailMeshPath.find_last_of('/') + 1, "Density" + std::to_string(static_cast<int>(percent)) + "/");
+		if (!redsandLegacyTrail) {
+			trailMeshPath = Redsand::Weapons::MapMeshPath(trailMeshPath, redsandWeaponProfile);
+			if (redsandConfig.diagnostics) {
+				static std::atomic<std::uint32_t> loggedProfiles{ 0 };
+				const auto bit = 1u << static_cast<unsigned>(redsandWeaponProfile);
+				if (!(loggedProfiles.fetch_or(bit) & bit)) {
+					const auto folder = Redsand::Weapons::ProfileFolder(redsandWeaponProfile);
+					RedsandLog::info("Redsand melee selection: weapon={:08X} profile={} mesh={}",
+						redsandWeapon ? redsandWeapon->GetFormID() : 0,
+						folder.empty() ? "Default"sv : folder, trailMeshPath);
 				}
 			}
+		}
+		if (redsandConfig.diagnostics) {
+			RedsandLog::info("Redsand melee scope: actor={:08X} player={} weapon={:08X} weaponType={} profile={} enabled={} playerEnabled={} npcEnabled={} allowed={} requested={} resolved={}",
+				redsandActor ? redsandActor->GetFormID() : 0, redsandActorIsPlayer,
+				redsandWeapon ? redsandWeapon->GetFormID() : 0,
+				redsandWeapon ? static_cast<unsigned>(redsandWeapon->GetWeaponType()) : 0,
+				static_cast<unsigned>(redsandWeaponProfile), redsandConfig.swordEnabled,
+				redsandConfig.swordPlayer, redsandConfig.swordNPC, redsandScopeAllowed, redsandRequestedMesh, trailMeshPath);
 		}
