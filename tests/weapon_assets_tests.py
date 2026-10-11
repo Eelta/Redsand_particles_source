@@ -11,39 +11,47 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "tools"))
 import generate_weapon_assets as assets
 
-ORIGINAL_TEMPLATE_SHA256 = {
-    "Blue.nif": "4a5c28119015bca56c1bf1fdd740f182a38088631bd968a593c3df85a9af245d",
-    "Bound.nif": "0487bb84fccc7620205903fad7114c4ec676898aade549fa2dadf13fb2e9b653",
-    "DefaultYellow.nif": "34f340de3beafcf2d20c1c373d3d80c39c943c3ce949f3b1482008296bc3b737",
-    "Fire.nif": "2cb0bac75ea7dcdbb167d834ba8a5117623aa39072100a6587234431b5c14fc2",
-    "Frost.nif": "00d56bb506b1595eafcb5fc51e05000c217fa9c3f87240e940bb4728eff6a5ac",
-    "Green.nif": "feb5804e7304da8a1b489bb44b9d9b21e7d231e628387324d6a2c5c3f4159e52",
-    "Purple.nif": "a2dc7acfbf266b221bf89b5d21eae9ad95ad391259718d01f9f9765ddee1acaa",
-    "Red.nif": "a45dd10d13279a148d1af9d5d55addd24ae7e823aa8bae4c41c7c64a2398772f",
-    "Shock.nif": "868293c59db8e5ae1fd4147c0afa421c10210dc92541ded37e76dc6a267d65ee",
-    "Sun.nif": "b9deaa57ad8adbdf3f20d1514c93275623a6086b3bcc362e046b34e1470ac4bb",
+PREVIOUS_TEMPLATE_SHA256 = {
+    "Default": "8ee748130f887ba9212ac4089064c258d5382482c6abe2a8ac84afd241558424",
+    "Sword": "2fc864d2b8bde28ce78a7e226b3f1f4e75ce86a1e871c08ec23127e018368d93",
+    "Dagger": "a88405796effc903e9058eb1e3474246d95b10bb1f1c5ccf4e36852dd8abc834",
+    "WarAxe": "bbcdd3f885d23c6b4ba3478459fe967dfe525cc554a9b19df523b2985f54f9b8",
+    "Mace": "5b4257bfd80bcfe203f7a6c511d85e2bc9feae85826f8b137b1fbeed28b9cf51",
+    "Greatsword": "c325e0b7b331dece234ae243cdc4ec516cf7ebea050d8f824dc1bd22cbf552a6",
+    "Battleaxe": "8982b166a464f6a04b90e9df646c5b5500d65eb39c9bcff5d117d1d9798dd103",
+    "Warhammer": "6ef797b428fe0deb9fd0d164f54aa4654b84ea20217acd11bce7b273511e1ad1",
+    "Bow": "ca2f0e6cb2f067eb60597abd050dd48db59e25f01812b5a3d9c8a91495207253",
+    "Crossbow": "30ca940239fa7e6162b494779ad13ec29f2cae9548cd828269bb7e57eb67a1c0"
 }
+ORIGINAL_DEFAULT_SHA256 = "34f340de3beafcf2d20c1c373d3d80c39c943c3ce949f3b1482008296bc3b737"
 
 class WeaponAssetTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        cls.sources = {path.name: path.read_bytes() for path in assets.BASE.glob("*.nif")}
-        if len(cls.sources) != 10:
-            raise AssertionError("Expected ten real base colour NIFs")
+        cls.sources = {"Default.nif": (assets.BASE / "Default.nif").read_bytes()}
 
-    def test_source_block_tables_round_trip_exactly(self):
-        for name, data in self.sources.items():
-            with self.subTest(name=name):
+    def test_source_block_tables_round_trip_and_restore_previous_category_assets_exactly(self):
+        for path in assets.BASE.glob("*.nif"):
+            with self.subTest(name=path.name):
+                data = path.read_bytes()
                 doc = assets.NifDocument.parse(data)
                 self.assertEqual(doc.serialize(), data)
-                self.assertEqual(len(assets.particle_systems(doc)), 1)
+                self.assertEqual(len(doc.blocks), 108)
+                system, = assets.particle_systems(doc)
+                source, start, end = assets.shader_texture(doc, system.shader)
+                self.assertEqual(source, f"textures\\RedsandParticles\\{path.stem}.dds")
+                previous = ("textures\\effects\\ElementalDesert\\circle_05.dds" if path.stem == "Default"
+                            else f"textures\\effects\\ElementalDesert\\WeaponStyles\\{path.stem}.dds").encode("ascii")
+                shader = doc.blocks[system.shader]
+                doc.blocks[system.shader] = shader[:start] + struct.pack("<I", len(previous)) + previous + shader[end:]
+                self.assertEqual(hashlib.sha256(doc.serialize()).hexdigest(), PREVIOUS_TEMPLATE_SHA256[path.stem])
 
-    def test_all_ninety_variants_parse_and_only_owned_blocks_change(self):
+    def test_nine_variants_parse_and_only_owned_blocks_change(self):
         for profile in assets.PROFILES:
             for name, data in self.sources.items():
                 with self.subTest(profile=profile.name, color=name):
                     original = assets.NifDocument.parse(data)
-                    variant_data = (assets.BASE / "WeaponStyles" / profile.name / name).read_bytes()
+                    variant_data = (assets.BASE / f"{profile.name}.nif").read_bytes()
                     variant = assets.NifDocument.parse(variant_data)
                     self.assertEqual(variant.serialize(), variant_data)
                     self.assertEqual(variant.types, original.types)
@@ -84,7 +92,12 @@ class WeaponAssetTests(unittest.TestCase):
                 doc.blocks = doc.blocks[:104]
                 restored = doc.serialize()
                 assets.NifDocument.parse(restored)
-                self.assertEqual(hashlib.sha256(restored).hexdigest(), ORIGINAL_TEMPLATE_SHA256[name])
+                source, start, end = assets.shader_texture(doc, 91)
+                old_texture = b"textures\\effects\\ElementalDesert\\circle_05.dds"
+                shader = doc.blocks[91]
+                doc.blocks[91] = shader[:start] + struct.pack("<I", len(old_texture)) + old_texture + shader[end:]
+                self.assertEqual(hashlib.sha256(doc.serialize()).hexdigest(), ORIGINAL_DEFAULT_SHA256)
+                doc.blocks[91] = shader
 
                 emitter = bytearray(doc.blocks[96])
                 struct.pack_into("<f", emitter, 57, 2.0)
@@ -93,7 +106,7 @@ class WeaponAssetTests(unittest.TestCase):
                 self.assertEqual(doc.serialize(), data)
 
     def test_motion_controllers_reference_the_real_emitter_and_match_category_bases(self):
-        paths = list(assets.BASE.glob("*.nif")) + list((assets.BASE / "WeaponStyles").glob("*/*.nif"))
+        paths = list(assets.BASE.glob("*.nif"))
         for path in paths:
             with self.subTest(path=str(path.relative_to(assets.BASE))):
                 doc = assets.NifDocument.parse(path.read_bytes())
@@ -125,7 +138,7 @@ class WeaponAssetTests(unittest.TestCase):
                 self.assertEqual(doc.serialize(), before, "Controller generation must be idempotent")
 
     def test_particle_uvs_sample_the_complete_shape_without_atlas_or_palette(self):
-        paths = list(assets.BASE.glob("*.nif")) + list((assets.BASE / "WeaponStyles").glob("*/*.nif"))
+        paths = list(assets.BASE.glob("*.nif"))
         for path in paths:
             with self.subTest(path=str(path.relative_to(assets.BASE))):
                 doc = assets.NifDocument.parse(path.read_bytes())
@@ -146,21 +159,22 @@ class WeaponAssetTests(unittest.TestCase):
         expected = {profile.name for profile in assets.PROFILES}
         self.assertEqual(len(expected), 9)
         self.assertNotIn("Staff", expected)
-        self.assertEqual({path.name for path in (assets.BASE / "WeaponStyles").iterdir() if path.is_dir()}, expected)
-        self.assertEqual({path.stem for path in assets.TEXTURES.glob("*.dds")}, expected)
-        self.assertEqual(len(list((assets.BASE / "WeaponStyles").glob("*/*.nif"))), 90)
+        self.assertEqual({path.stem for path in assets.BASE.glob("*.nif")}, expected | {"Default"})
+        self.assertEqual({path.stem for path in assets.TEXTURES.glob("*.dds")}, expected | {"Default"})
+        self.assertEqual(len(list(assets.BASE.iterdir())), 10)
+        self.assertEqual(len(list(assets.TEXTURES.iterdir())), 10)
 
     def test_texture_change_is_on_named_particle_material_and_preserves_colour(self):
         for profile in assets.PROFILES:
             for name, data in self.sources.items():
                 with self.subTest(profile=profile.name, color=name):
                     before = assets.NifDocument.parse(data)
-                    after = assets.NifDocument.parse((assets.BASE / "WeaponStyles" / profile.name / name).read_bytes())
+                    after = assets.NifDocument.parse((assets.BASE / f"{profile.name}.nif").read_bytes())
                     for system in assets.particle_systems(before):
                         old_source, start, old_end = assets.shader_texture(before, system.shader)
                         source, new_start, new_end = assets.shader_texture(after, system.shader)
-                        self.assertEqual(old_source, "textures\\effects\\ElementalDesert\\circle_05.dds")
-                        self.assertEqual(source, f"textures\\effects\\ElementalDesert\\WeaponStyles\\{profile.name}.dds")
+                        self.assertEqual(old_source, "textures\\RedsandParticles\\Default.dds")
+                        self.assertEqual(source, f"textures\\RedsandParticles\\{profile.name}.dds")
                         self.assertEqual(start, new_start)
                         self.assertEqual(after.blocks[system.shader][:start], before.blocks[system.shader][:start])
                         self.assertEqual(after.blocks[system.shader][new_end:], before.blocks[system.shader][old_end:])
@@ -172,7 +186,7 @@ class WeaponAssetTests(unittest.TestCase):
             for name, data in self.sources.items():
                 with self.subTest(profile=profile.name, color=name):
                     before = assets.NifDocument.parse(data)
-                    after = assets.NifDocument.parse((assets.BASE / "WeaponStyles" / profile.name / name).read_bytes())
+                    after = assets.NifDocument.parse((assets.BASE / f"{profile.name}.nif").read_bytes())
                     for system in assets.particle_systems(before):
                         for index in system.modifiers:
                             block_type = before.types[index]
@@ -241,11 +255,11 @@ class WeaponAssetTests(unittest.TestCase):
                 self.assertEqual((assets.TEXTURES / f"{profile.name}.dds").read_bytes(),
                                  assets.dds_bytes(assets.texture_pixels(profile)))
                 for name, data in self.sources.items():
-                    self.assertEqual((assets.BASE / "WeaponStyles" / profile.name / name).read_bytes(),
+                    self.assertEqual((assets.BASE / f"{profile.name}.nif").read_bytes(),
                                      assets.variant_bytes(data, profile))
 
     def test_malformed_sources_fail_closed(self):
-        data = self.sources["DefaultYellow.nif"]
+        data = self.sources["Default.nif"]
         with self.assertRaises(assets.FormatError):
             assets.NifDocument.parse(data[:-1])
         with self.assertRaises(assets.FormatError):
@@ -255,7 +269,7 @@ class WeaponAssetTests(unittest.TestCase):
         doc = assets.NifDocument.parse(data)
         system = assets.particle_systems(doc)[0]
 
-        doc.blocks[system.shader] = doc.blocks[system.shader].replace(b"circle_05.dds", b"wrong__05.dds")
+        doc.blocks[system.shader] = doc.blocks[system.shader].replace(b"Default.dds", b"Wrong__.dds")
         with self.assertRaises(assets.FormatError):
             assets.variant_bytes(doc.serialize(), assets.PROFILES[0])
         doc = assets.NifDocument.parse(data)

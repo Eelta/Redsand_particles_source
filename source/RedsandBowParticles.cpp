@@ -34,7 +34,7 @@ namespace RedsandBowParticles
 		static_assert(static_cast<std::uint32_t>(RE::ATTACK_STATE_ENUM::kBowReleased) == 12);
 		constexpr std::size_t maxStreams = 32;
 		constexpr std::size_t maxQueuedSamples = 2048;
-		constexpr char particleMesh[] = "Effects/WeaponTrails/ElementalDesert/DefaultYellow.nif";
+		constexpr char particleMesh[] = "RedsandParticles/Default.nif";
 		std::atomic_bool enabled = false;
 		std::atomic_uint64_t generation = 0;
 		std::atomic<RE::FormID> rapidComboWeapon = 0;

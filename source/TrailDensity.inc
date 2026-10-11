@@ -1,7 +1,7 @@
 const auto redsandRequestedMesh = redsandConfig.diagnostics ? trailMeshPath : std::string{};
 		trailMeshPath = Redsand::Weapons::ResolveMeleeMesh(redsandScopeAllowed, trailMeshPath, Settings::attackTrailMeshPath);
 		if (!redsandLegacyTrail && (trailMeshPath == Settings::attackTrailMeshPath || trailMeshPath == "Effects/WeaponTrails/AttackTrailMagic.nif")) {
-			trailMeshPath = "Effects/WeaponTrails/ElementalDesert/DefaultYellow.nif";
+			trailMeshPath = "RedsandParticles/Default.nif";
 		}
 		if (!redsandLegacyTrail && !baseColorOverride) {
 			baseColorOverride = RE::NiColorA{ 0.025f, 0.080f, 0.650f, 1.f };

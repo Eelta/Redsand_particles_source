@@ -83,25 +83,22 @@ foreach ($relative in $expectedFiles.Keys) { $null = StageFile $relative }
 $pluginsInPackage = @(Get-ChildItem -LiteralPath $stage -Recurse -File | Where-Object { $_.Extension -in @('.esp', '.esm', '.esl') })
 Require ($pluginsInPackage.Count -eq 0) 'Redsand must not package ESP, ESM or ESL plugins'
 Require (@(Get-ChildItem -LiteralPath $stage -Recurse -Filter '*.pex' -File).Count -eq 0) 'The runtime menu must not require Papyrus scripts'
-foreach ($required in @('SKSE\Plugins\Precision.dll', 'SKSE\Plugins\RedsandParticles.ini', 'SKSE\Plugins\Precision\Precision_ElementalDesert.toml', 'Meshes\Effects\WeaponTrails\ElementalDesert\DefaultYellow.nif', 'Textures\effects\ElementalDesert\circle_05.dds')) {
+foreach ($required in @('SKSE\Plugins\Precision.dll', 'SKSE\Plugins\RedsandParticles.ini', 'SKSE\Plugins\Precision\Precision_ElementalDesert.toml', 'Meshes\RedsandParticles\Default.nif', 'Textures\RedsandParticles\Default.dds')) {
     Require (Test-Path -LiteralPath (Join-Path $stage $required) -PathType Leaf) "Missing required runtime file: $required"
 }
 $weaponProfiles = @('Sword', 'Dagger', 'WarAxe', 'Mace', 'Greatsword', 'Battleaxe', 'Warhammer', 'Bow', 'Crossbow')
-$weaponColors = @('Blue', 'Bound', 'DefaultYellow', 'Fire', 'Frost', 'Green', 'Purple', 'Red', 'Shock', 'Sun')
-$styleMeshRoot = Join-Path $stage 'Meshes\Effects\WeaponTrails\ElementalDesert\WeaponStyles'
-$styleTextureRoot = Join-Path $stage 'Textures\effects\ElementalDesert\WeaponStyles'
+$styleMeshRoot = Join-Path $stage 'Meshes\RedsandParticles'
+$styleTextureRoot = Join-Path $stage 'Textures\RedsandParticles'
 Require (Test-Path -LiteralPath $styleMeshRoot -PathType Container) 'Missing weapon style meshes'
 Require (Test-Path -LiteralPath $styleTextureRoot -PathType Container) 'Missing weapon shape textures'
-Require (@(Get-ChildItem -LiteralPath $styleMeshRoot -Directory).Count -eq 9) 'Expected nine weapon style mesh folders'
-Require (@(Get-ChildItem -LiteralPath $styleMeshRoot -Recurse -File).Count -eq 90) 'Expected 90 colored weapon style NIF variants'
-Require (@(Get-ChildItem -LiteralPath $styleTextureRoot -Recurse -File).Count -eq 9) 'Expected nine weapon shape DDS textures'
+Require (@(Get-ChildItem -LiteralPath $styleMeshRoot -Directory).Count -eq 0) 'Weapon meshes must use one flat folder'
+Require (@(Get-ChildItem -LiteralPath $styleTextureRoot -Directory).Count -eq 0) 'Particle textures must use one flat folder'
+Require (@(Get-ChildItem -LiteralPath $stage -Recurse -File -Filter '*.nif').Count -eq 10) 'Expected ten shared-color particle NIFs'
+Require (@(Get-ChildItem -LiteralPath $stage -Recurse -File -Filter '*.dds').Count -eq 10) 'Expected default texture and nine weapon shape DDS textures'
 Require (-not (Test-Path -LiteralPath (Join-Path $styleMeshRoot 'Staff'))) 'Removed staff style must not be packaged'
 Require (-not (Test-Path -LiteralPath (Join-Path $styleTextureRoot 'Staff.dds'))) 'Removed staff texture must not be packaged'
-foreach ($profile in $weaponProfiles) {
-    foreach ($color in $weaponColors) {
-        $relative = "Meshes\Effects\WeaponTrails\ElementalDesert\WeaponStyles\$profile\$color.nif"
-        Require (Test-Path -LiteralPath (Join-Path $stage $relative) -PathType Leaf) "Missing colored weapon style variant: $profile/$color"
-    }
+foreach ($profile in @('Default') + $weaponProfiles) {
+    Require (Test-Path -LiteralPath (Join-Path $styleMeshRoot ($profile + '.nif')) -PathType Leaf) "Missing particle mesh: $profile"
     $texture = Join-Path $styleTextureRoot ($profile + '.dds')
     Require (Test-Path -LiteralPath $texture -PathType Leaf) "Missing weapon shape texture: $profile"
 }
@@ -136,9 +133,9 @@ if sys.version_info < (3, 10):
     raise SystemExit('Package NIF checks require Python 3.10 or newer')
 sys.path.insert(0, str(Path(sys.argv[1]) / 'tools'))
 import generate_weapon_assets as assets
-root = Path(sys.argv[2]) / 'Meshes/Effects/WeaponTrails/ElementalDesert'
+root = Path(sys.argv[2]) / 'Meshes/RedsandParticles'
 paths = sorted(root.rglob('*.nif'))
-assert len(paths) == 100, f'Expected 100 runtime NIFs, found {len(paths)}'
+assert len(paths) == 10, f'Expected 10 runtime NIFs, found {len(paths)}'
 expected_chain = ('NiPSysEmitterCtlr', 'NiPSysEmitterSpeedCtlr',
                   'NiPSysEmitterInitialRadiusCtlr', 'NiPSysUpdateCtlr')
 for path in paths:
@@ -149,6 +146,10 @@ for path in paths:
     systems = assets.particle_systems(doc)
     assert len(systems) == 1, f'Expected one named particle system: {path}'
     system = systems[0]
+    texture, _, _ = assets.shader_texture(doc, system.shader)
+    expected_texture = f'textures\\RedsandParticles\\{path.stem}.dds'
+    assert texture == expected_texture, f'Wrong particle texture: {path}'
+    assert (Path(sys.argv[2]) / texture.replace('\\', '/')).is_file(), f'Missing texture: {texture}'
     chain = assets.particle_controllers(doc, system)
     assert tuple(doc.types[item.index] for item in chain) == expected_chain, f'Wrong controller order: {path}'
     birth = chain[0]
@@ -164,13 +165,13 @@ for path in paths:
         value, reference = struct.unpack('<fi', doc.require_block(item.interpolator, 'NiFloatInterpolator'))
         assert math.isfinite(value) and value == fields[key][1] and reference == -1, f'Wrong constant {key}: {path}'
     assert fields['radius'][1] * .25 > fields['radius_variation'][1], f'Unsafe minimum radius: {path}'
-print('PASS: 100 packaged NIFs retain private constant speed/radius controllers before particle update')
+print('PASS: 10 packaged NIFs retain particle controllers and resolve their flat texture paths')
 '@
 & $PythonPath -I -B -c $nifCheck (Split-Path -Parent $assets) $stage
 Require ($LASTEXITCODE -eq 0) 'Packaged NIF/controller validation failed'
 $manifest = Get-Content -LiteralPath $manifestFile -Raw | ConvertFrom-Json
 Require ($manifest.packageFormat -eq 'RuntimeFiles') 'Manifest packageFormat must be RuntimeFiles'
-Require ($manifest.PSObject.Properties.Name -contains 'packageVersion' -and $manifest.packageVersion -eq '0.5.6') 'Manifest packageVersion must be 0.5.6'
+Require ($manifest.PSObject.Properties.Name -contains 'packageVersion' -and $manifest.packageVersion -eq '0.5.7') 'Manifest packageVersion must be 0.5.7'
 Require ($manifest.PSObject.Properties.Name -contains 'redsandESPRequired' -and $manifest.redsandESPRequired -is [bool] -and !$manifest.redsandESPRequired) 'Redsand must not require its legacy ESP'
 Require ($manifest.PSObject.Properties.Name -contains 'independentDiagnosticLog' -and $manifest.independentDiagnosticLog -ceq 'RedsandParticles.log') 'Diagnostics must use the independent RedsandParticles.log file'
 Require ($manifest.PSObject.Properties.Name -contains 'diagnosticLoggingDefault' -and $manifest.diagnosticLoggingDefault -is [bool] -and !$manifest.diagnosticLoggingDefault) 'Diagnostic logging must default to off'
@@ -182,9 +183,10 @@ foreach ($field in @('redsandRealtimeMenu', 'runtimeParticleSettings', 'bowConti
     Require ($manifest.PSObject.Properties.Name -contains $field -and $manifest.$field -eq 1) "Missing runtime-settings provenance: $field"
 }
 Require ($manifest.PSObject.Properties.Name -contains 'swordTipAttachment' -and $manifest.swordTipAttachment -eq 2) 'Sword-tip provenance must declare the swept-emitter implementation'
-foreach ($field in @('swordTipSweptEmitter', 'swordEmitterObjectTraversal', 'staffParticlesRemoved', 'swordSpreadControl', 'swordSizeControl', 'bilingualMenu')) {
-    Require ($manifest.PSObject.Properties.Name -contains $field -and $manifest.$field -is [bool] -and $manifest.$field) "Missing 0.5.6 runtime provenance: $field"
+foreach ($field in @('swordTipSweptEmitter', 'swordEmitterObjectTraversal', 'staffParticlesRemoved', 'swordSpreadControl', 'swordSizeControl', 'bilingualMenu', 'sharedWeaponColorMeshes', 'flatParticleAssetPaths')) {
+    Require ($manifest.PSObject.Properties.Name -contains $field -and $manifest.$field -is [bool] -and $manifest.$field) "Missing 0.5.7 runtime provenance: $field"
 }
+Require ($manifest.particleMeshFiles -eq 10) 'Manifest must declare ten particle meshes shared by all colors'
 foreach ($field in @('staffParticles', 'staffIndependentOfBowOptions', 'staffParticleEffects')) {
     Require (-not ($manifest.PSObject.Properties.Name -contains $field)) "Removed staff provenance remains: $field"
 }
@@ -210,4 +212,4 @@ foreach ($property in $manifest.sourceSHA256.PSObject.Properties) {
     Require ($property.Value -match '^[0-9a-fA-F]{64}$' -and $property.Value -eq (Get-FileHash -LiteralPath $sourceFile -Algorithm SHA256).Hash) "Source checksum mismatch: $($property.Name)"
 }
 Require (@(Get-ChildItem -LiteralPath $sourceRoot -Recurse -File).Count -eq @($manifest.sourceSHA256.PSObject.Properties).Count) 'Local build manifest must cover every source file'
-Write-Output 'PASS: 0.5.6 flat runtime files only, nine weapon styles, 100 NIF controller chains, nine DDS shapes, no ESP/ESM/ESL, bilingual/melee/bow defaults and local asset/DLL/source provenance'
+Write-Output 'PASS: 0.5.7 flat runtime files only, ten shared-color NIFs, ten DDS textures, no ESP/ESM/ESL, bilingual/melee/bow defaults and local asset/DLL/source provenance'

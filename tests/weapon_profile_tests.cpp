@@ -68,10 +68,10 @@ namespace
 		Check(Resolve({ "SwordCopy.esp", 1, false }) == Profile::Default, "a mod copying a vanilla weapon must keep the default");
 	}
 
-	void EveryReleasedColorMapsWithoutLosingEnchantmentColor()
+	void ReleasedPathsMapToCanonicalClassAssets()
 	{
 		constexpr std::array profiles = {
-			Profile::Sword, Profile::Dagger, Profile::WarAxe, Profile::Mace,
+			Profile::Default, Profile::Sword, Profile::Dagger, Profile::WarAxe, Profile::Mace,
 			Profile::Greatsword, Profile::Battleaxe, Profile::Warhammer,
 			Profile::Bow, Profile::Crossbow
 		};
@@ -81,18 +81,30 @@ namespace
 		};
 		for (const auto profile : profiles) {
 			const auto folder = ProfileFolder(profile);
-			Check(!folder.empty(), "a nondefault profile has no asset folder");
+			const auto expected = std::string("RedsandParticles/") + std::string(folder.empty() ? "Default" : folder) + ".nif";
+			Check(MapMeshPath("RedsandParticles/Default.nif", profile) == expected, "canonical default did not select the weapon category");
+			if (profile != Profile::Default) {
+				Check(MapMeshPath(expected, Profile::Default) == expected && MapMeshPath(expected, Profile::Sword) == expected,
+					"an explicitly selected canonical category was replaced");
+			}
 			for (const auto color : colors) {
 				const auto input = std::string("Effects/WeaponTrails/ElementalDesert/") + color;
-				const auto expected = std::string("Effects/WeaponTrails/ElementalDesert/WeaponStyles/") + std::string(folder) + '/' + color;
-				Check(MapMeshPath(input, profile) == expected, "a weapon style lost its existing enchantment color");
-				Check(MapMeshPath(input, Profile::Default) == input, "a mod weapon lost its existing default/enchantment mesh");
+				Check(MapMeshPath(input, profile) == expected, "a legacy color path did not resolve to its canonical category");
+				if (profile != Profile::Default) {
+					const auto explicitStyle = std::string("Effects/WeaponTrails/ElementalDesert/WeaponStyles/") + std::string(folder) + '/' + color;
+					Check(MapMeshPath(explicitStyle, Profile::Default) == expected && MapMeshPath(explicitStyle, Profile::Sword) == expected,
+						"an explicitly selected legacy category was replaced or lost");
+				}
 			}
 		}
 		Check(ProfileFolder(Profile::Default).empty(), "default profile must have no replacement folder");
 		Check(ProfileFolder(static_cast<Profile>(255)).empty(), "invalid profile must not generate an asset path");
 		Check(MapMeshPath("effects\\weapontrails\\elementaldesert\\rEd.NIF", Profile::Dagger) ==
-			"Effects/WeaponTrails/ElementalDesert/WeaponStyles/Dagger/Red.nif", "NIF matching must tolerate Windows separators and casing");
+			"RedsandParticles/Dagger.nif", "legacy NIF matching must tolerate Windows separators and casing");
+		Check(MapMeshPath("effects\\weapontrails\\elementaldesert\\weaponstyles\\bOw\\rEd.NIF", Profile::Dagger) ==
+			"RedsandParticles/Bow.nif", "explicit legacy categories must tolerate Windows separators and casing");
+		Check(MapMeshPath("rEdSaNdPaRtIcLeS\\dEfAuLt.NIF", Profile::Dagger) ==
+			"RedsandParticles/Dagger.nif", "canonical default matching must tolerate Windows separators and casing");
 	}
 
 	void CustomAndLegacyPathsStayUntouched()
@@ -100,8 +112,11 @@ namespace
 		for (const auto path : {
 			"", "Effects/OtherMod/Red.nif", "Meshes/Effects/WeaponTrails/ElementalDesert/Red.nif",
 			"Effects/WeaponTrails/ElementalDesert/Custom.nif", "Effects/WeaponTrails/ElementalDesert/Red.nif.bak",
-			"Effects/WeaponTrails/ElementalDesert/Density75/Red.nif", "Effects/WeaponTrails/ElementalDesert/WeaponStyles/Bow/Red.nif",
-			"Effects/WeaponTrails/ElementalDesert/../Red.nif", "Effects/WeaponTrails/ElementalDesertX/Red.nif"
+			"Effects/WeaponTrails/ElementalDesert/Density75/Red.nif", "Effects/WeaponTrails/ElementalDesert/WeaponStyles/Bow/Custom.nif",
+			"Effects/WeaponTrails/ElementalDesert/WeaponStyles/Staff/Red.nif", "Effects/WeaponTrails/ElementalDesert/WeaponStyles/Custom/Red.nif",
+			"Effects/WeaponTrails/ElementalDesert/../Red.nif", "Effects/WeaponTrails/ElementalDesertX/Red.nif",
+			"RedsandParticles/Custom.nif", "RedsandParticles/Default.nif.bak", "RedsandParticlesOther/Default.nif",
+			"RedsandParticles/../Default.nif", "RedsandParticles/subfolder/Default.nif"
 		}) {
 			Check(MapMeshPath(path, Profile::Sword) == path, "path mapping replaced another mod's or a legacy mesh");
 		}
@@ -149,7 +164,7 @@ int main()
 		EveryVanillaWeaponCategoryHasItsOwnProfile();
 		OriginMatchingCannotAdoptModWeapons();
 		LocalizationAndLoadOrderCannotChangeAProfile();
-		EveryReleasedColorMapsWithoutLosingEnchantmentColor();
+		ReleasedPathsMapToCanonicalClassAssets();
 		CustomAndLegacyPathsStayUntouched();
 		RapidComboProxyKeepsTheEquippedBowsVisualProfile();
 		std::cout << "PASS: vanilla weapon profiles, localized/load-order independence, mod fallback and color-preserving mesh routing\n";

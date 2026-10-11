@@ -7,7 +7,7 @@ EffectNames = ["Bound", "FX"]
 LifetimeMult = 1.0
 BaseColorOverride = { r = 0.59, g = 0.24, b = 1, a = 1.0 }
 BaseColorScaleMult = 2.60000000
-TrailMeshOverride = "Effects/WeaponTrails/ElementalDesert/Bound.nif"
+TrailMeshOverride = "RedsandParticles/Default.nif"
 
 [[TrailDefinition]]
 Priority = 9999
@@ -20,7 +20,7 @@ EffectKeywords = ["MagicTurnUndead"]
 LifetimeMult = 1.0
 BaseColorOverride = { r = 1, g = 0.72, b = 0.19, a = 1.0 }
 BaseColorScaleMult = 2.60000000
-TrailMeshOverride = "Effects/WeaponTrails/ElementalDesert/Sun.nif"
+TrailMeshOverride = "RedsandParticles/Default.nif"
 
 [[TrailDefinition]]
 Priority = 9998
@@ -30,7 +30,7 @@ EffectShaders = [{ FormID = 382470, Plugin = "Skyrim.esm" }]
 LifetimeMult = 1.0
 BaseColorOverride = { r = 0.32, g = 1, b = 0.12, a = 1.0 }
 BaseColorScaleMult = 2.60000000
-TrailMeshOverride = "Effects/WeaponTrails/ElementalDesert/Green.nif"
+TrailMeshOverride = "RedsandParticles/Default.nif"
 
 [[TrailDefinition]]
 Priority = 9997
@@ -40,7 +40,7 @@ EffectShaders = [{ FormID = 382471, Plugin = "Skyrim.esm" }]
 LifetimeMult = 1.0
 BaseColorOverride = { r = 0.63, g = 0.16, b = 1, a = 1.0 }
 BaseColorScaleMult = 2.60000000
-TrailMeshOverride = "Effects/WeaponTrails/ElementalDesert/Purple.nif"
+TrailMeshOverride = "RedsandParticles/Default.nif"
 
 [[TrailDefinition]]
 Priority = 9996
@@ -50,7 +50,7 @@ EffectShaders = [{ FormID = 382472, Plugin = "Skyrim.esm" }]
 LifetimeMult = 1.0
 BaseColorOverride = { r = 0.15, g = 0.4, b = 1, a = 1.0 }
 BaseColorScaleMult = 2.60000000
-TrailMeshOverride = "Effects/WeaponTrails/ElementalDesert/Blue.nif"
+TrailMeshOverride = "RedsandParticles/Default.nif"
 
 [[TrailDefinition]]
 Priority = 9995
@@ -60,7 +60,7 @@ EffectShaders = [{ FormID = 882273, Plugin = "Skyrim.esm" }]
 LifetimeMult = 1.0
 BaseColorOverride = { r = 1, g = 0.065, b = 0.12, a = 1.0 }
 BaseColorScaleMult = 2.60000000
-TrailMeshOverride = "Effects/WeaponTrails/ElementalDesert/Red.nif"
+TrailMeshOverride = "RedsandParticles/Default.nif"
 
 [[TrailDefinition]]
 Priority = 9994
@@ -71,7 +71,7 @@ EffectShaders = [{ FormID = 321552, Plugin = "Skyrim.esm" }]
 LifetimeMult = 1.0
 BaseColorOverride = { r = 1, g = 0.3, b = 0.055, a = 1.0 }
 BaseColorScaleMult = 2.60000000
-TrailMeshOverride = "Effects/WeaponTrails/ElementalDesert/Fire.nif"
+TrailMeshOverride = "RedsandParticles/Default.nif"
 
 [[TrailDefinition]]
 Priority = 9993
@@ -82,7 +82,7 @@ EffectShaders = [{ FormID = 326173, Plugin = "Skyrim.esm" }]
 LifetimeMult = 1.0
 BaseColorOverride = { r = 0.34, g = 0.76, b = 1, a = 1.0 }
 BaseColorScaleMult = 2.60000000
-TrailMeshOverride = "Effects/WeaponTrails/ElementalDesert/Frost.nif"
+TrailMeshOverride = "RedsandParticles/Default.nif"
 
 [[TrailDefinition]]
 Priority = 9992
@@ -93,4 +93,4 @@ EffectShaders = [{ FormID = 368346, Plugin = "Skyrim.esm" }]
 LifetimeMult = 1.0
 BaseColorOverride = { r = 0.48, g = 0.58, b = 1, a = 1.0 }
 BaseColorScaleMult = 2.60000000
-TrailMeshOverride = "Effects/WeaponTrails/ElementalDesert/Shock.nif"
+TrailMeshOverride = "RedsandParticles/Default.nif"

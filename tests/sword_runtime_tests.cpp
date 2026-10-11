@@ -485,7 +485,7 @@ namespace
 			auto* a_weaponItem = &entry;
 			baseColorOverride.reset();
 #include "../source/TrailActorStyle.inc"
-			std::string trailMeshPath = redsandLegacyTrail ? Settings::attackTrailMeshPath : "Effects/WeaponTrails/ElementalDesert/DefaultYellow.nif";
+			std::string trailMeshPath = redsandLegacyTrail ? Settings::attackTrailMeshPath : "RedsandParticles/Default.nif";
 			if (!requested.empty()) { trailMeshPath = requested; }
 #include "../source/TrailDensity.inc"
 			return trailMeshPath;
@@ -496,13 +496,14 @@ namespace
 	{
 		using Redsand::Weapons::IsParticleMesh;
 		using Redsand::Weapons::ResolveMeleeMesh;
-		constexpr auto own = "Effects/WeaponTrails/ElementalDesert/DefaultYellow.nif";
+		constexpr auto own = "RedsandParticles/Default.nif";
 		constexpr auto customRibbon = "Effects/WeaponTrails/CustomRibbon.nif";
 		constexpr auto hardRibbon = "Effects/WeaponTrails/AttackTrail.nif";
-		constexpr std::array<std::string_view, 6> ownMeshes{
+		constexpr std::array<std::string_view, 10> ownMeshes{
 			own, "effects\\weapontrails\\elementaldesert\\WeaponStyles\\Sword\\Fire.nif",
 			"Effects/WeaponTrails/ElementalDesert/Density5/Blue.nif", "Effects/WeaponTrails/ElementalDesert/UnknownColor.nif",
-			"MESHES\\EFFECTS\\WeaponTrails\\ElementalDesert\\Red.nif", "Data/Meshes/Effects/WeaponTrails/ElementalDesert/Frost.nif"
+			"MESHES\\EFFECTS\\WeaponTrails\\ElementalDesert\\Red.nif", "Data/Meshes/Effects/WeaponTrails/ElementalDesert/Frost.nif",
+			"RedsandParticles/Sword.nif", "rEdSaNdPaRtIcLeS\\Custom.nif", "Meshes/RedsandParticles/Default.nif", "Data\\Meshes\\RedsandParticles\\Sword.nif"
 		};
 		RE::TESObjectWEAP weapon;
 		for (const bool player : { false, true }) {
@@ -547,6 +548,8 @@ namespace
 			"an unresolved actor emitted particles before its scope could be checked");
 		constexpr auto unrelated = "Effects/WeaponTrails/ElementalDesertOther/Fire.nif";
 		Check(ResolveMeleeMesh(false, unrelated, own) == unrelated, "scope matching consumed another mod's similarly named folder");
+		Check(ResolveMeleeMesh(false, "RedsandParticlesOther/Default.nif", own) == "RedsandParticlesOther/Default.nif",
+			"scope matching consumed another mod's similarly named canonical folder");
 		Check(ResolveMeleeMesh(false, own, "mEsHeS\\eFfEcTs\\wEaPoNtRaIlS\\eLeMeNtAlDeSeRt\\Blue.nif") == hardRibbon,
 			"installed own fallback did not honor Windows case/slash variants");
 		Check(RedsandLog::informationLogs == 0, "disabled diagnostics emitted constructor logs");

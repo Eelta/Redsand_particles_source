@@ -18,8 +18,10 @@ namespace Redsand::Weapons
 				break;
 			}
 		}
-		constexpr std::string_view prefix = "Effects/WeaponTrails/ElementalDesert/";
-		return path.size() >= prefix.size() && detail::EqualMeshPath(path.substr(0, prefix.size()), prefix);
+		for (const auto prefix : std::array<std::string_view, 2>{ "RedsandParticles/", "Effects/WeaponTrails/ElementalDesert/" }) {
+			if (path.size() >= prefix.size() && detail::EqualMeshPath(path.substr(0, prefix.size()), prefix)) { return true; }
+		}
+		return false;
 	}
 
 	inline std::string ResolveMeleeMesh(bool particlesAllowed, std::string_view requested, std::string_view installedRibbon)

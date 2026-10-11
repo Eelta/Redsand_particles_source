@@ -182,12 +182,12 @@ try {
     $anchor = "`t`t`tif (a_bExpired) {  // fade out alpha"
     $cpp = Replace-One $cpp $anchor ((Text (Join-Path $PSScriptRoot 'source/ParticleLiveBrightness.inc')) + $anchor)
     $anchor = "`t`tstd::string trailMeshPath = Settings::attackTrailMeshPath;"
-    $defaultMesh = "`t`tstd::string trailMeshPath = redsandLegacyTrail ? Settings::attackTrailMeshPath : `"Effects/WeaponTrails/ElementalDesert/DefaultYellow.nif`";"
+    $defaultMesh = "`t`tstd::string trailMeshPath = redsandLegacyTrail ? Settings::attackTrailMeshPath : `"RedsandParticles/Default.nif`";"
     $cpp = Replace-One $cpp $anchor ((Text (Join-Path $PSScriptRoot 'source/TrailActorStyle.inc')) + $defaultMesh)
 
     foreach ($list in @('All', 'Any')) {
         $anchor = "auto search$list = std::find_if(Settings::trailDefinitions$list.begin(), Settings::trailDefinitions$list.end(), [&](const TrailDefinition& a_trailDefinition) {"
-        $guard = "`n`t`tconst bool particleDefinition = a_trailDefinition.trailOverride.meshOverride && a_trailDefinition.trailOverride.meshOverride->starts_with(`"Effects/WeaponTrails/ElementalDesert/`");`n`t`tif (particleDefinition == redsandLegacyTrail) {`n`t`t`treturn false;`n`t`t}"
+        $guard = "`n`t`tconst bool particleDefinition = a_trailDefinition.trailOverride.meshOverride && Redsand::Weapons::IsParticleMesh(*a_trailDefinition.trailOverride.meshOverride);`n`t`tif (particleDefinition == redsandLegacyTrail) {`n`t`t`treturn false;`n`t`t}"
         $cpp = Replace-One $cpp $anchor ($anchor + $guard)
     }
 
@@ -342,6 +342,9 @@ try {
         modWeaponStyleFallback='Default'
         weaponStyleProfiles=9
         weaponShapeTextures=9
+        sharedWeaponColorMeshes=$true
+        particleMeshFiles=10
+        flatParticleAssetPaths=$true
         sourceSHA256=$sourceHashes
         bowRapidFireStreamRecovery=1
         bowOrderedReleaseProcessing=1

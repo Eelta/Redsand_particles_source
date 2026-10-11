@@ -36,7 +36,7 @@ foreach ($path in $preservedPaths) {
     if (Test-Path -LiteralPath $path) { $preservedHashes[$path] = (Get-FileHash -LiteralPath $path -Algorithm SHA256).Hash }
 }
 $manifest = Get-Content -LiteralPath $manifestPath -Raw | ConvertFrom-Json
-if ($manifest.packageFormat -ne 'RuntimeFiles' -or $manifest.packageVersion -ne '0.5.6' -or
+if ($manifest.packageFormat -ne 'RuntimeFiles' -or $manifest.packageVersion -ne '0.5.7' -or
     $manifest.redsandESPRequired -ne $false -or
     $manifest.footIKDriverInfoOffset -ne '0x88' -or
     $manifest.footIKFixRuntimes -notcontains 'SE' -or $manifest.footIKFixRuntimes -notcontains 'AE' -or
@@ -48,7 +48,7 @@ if ($manifest.packageFormat -ne 'RuntimeFiles' -or $manifest.packageVersion -ne 
     throw 'The local build manifest does not describe the current runtime release.'
 }
 foreach ($field in @('swordTipSweptEmitter', 'swordEmitterObjectTraversal', 'staffParticlesRemoved',
-    'swordSpreadControl', 'swordSizeControl', 'bilingualMenu', 'embeddedLicenseNotices')) {
+    'swordSpreadControl', 'swordSizeControl', 'bilingualMenu', 'embeddedLicenseNotices', 'sharedWeaponColorMeshes', 'flatParticleAssetPaths')) {
     if ($manifest.PSObject.Properties.Name -notcontains $field -or $manifest.$field -isnot [bool] -or -not $manifest.$field) {
         throw "The local build manifest is missing the current fix: $field"
     }
@@ -56,7 +56,7 @@ foreach ($field in @('swordTipSweptEmitter', 'swordEmitterObjectTraversal', 'sta
 $currentVersions = @{
     redsandRealtimeMenu=1; runtimeParticleSettings=1; swordTipAttachment=2;
     bowParticles=17; bowMotionDiagnostics=2; bowRapidFireRecovery=4; bowContinuousSamplingRecovery=1;
-    vanillaWeaponClassStyles=1; weaponStyleProfiles=9; weaponShapeTextures=9; skseMenuFrameworkAPI=2
+    vanillaWeaponClassStyles=1; weaponStyleProfiles=9; weaponShapeTextures=9; particleMeshFiles=10; skseMenuFrameworkAPI=2
 }
 foreach ($field in $currentVersions.Keys) {
     if ($manifest.PSObject.Properties.Name -notcontains $field -or $manifest.$field -ne $currentVersions[$field]) {

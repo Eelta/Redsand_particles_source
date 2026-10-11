@@ -8,8 +8,8 @@ import struct
 import zlib
 
 ROOT = Path(__file__).resolve().parents[1]
-BASE = ROOT / "assets/Basic/Meshes/Effects/WeaponTrails/ElementalDesert"
-TEXTURES = ROOT / "assets/Basic/Textures/effects/ElementalDesert/WeaponStyles"
+BASE = ROOT / "assets/Basic/Meshes/RedsandParticles"
+TEXTURES = ROOT / "assets/Basic/Textures/RedsandParticles"
 PARTICLE_TAG = "RedsandParticles_Drain_v1"
 
 @dataclass(frozen=True)
@@ -397,9 +397,9 @@ def variant_bytes(data: bytes, profile: Profile) -> bytes:
         if flags1 & 0x30 or transform != (0.0, 0.0, 1.0, 1.0) or greyscale:
             raise FormatError("Weapon shapes require neutral full-texture UVs without a greyscale palette")
         source, start, end = shader_texture(doc, system.shader)
-        if source.casefold().replace("/", "\\") != "textures\\effects\\elementaldesert\\circle_05.dds":
-            raise FormatError("The source particle texture is not the expected original circle_05.dds")
-        texture = f"textures\\effects\\ElementalDesert\\WeaponStyles\\{profile.name}.dds".encode("ascii")
+        if source.casefold().replace("/", "\\") != "textures\\redsandparticles\\default.dds":
+            raise FormatError("The source particle texture is not the expected Default.dds")
+        texture = f"textures\\RedsandParticles\\{profile.name}.dds".encode("ascii")
         shader = doc.blocks[system.shader]
         doc.blocks[system.shader] = shader[:start] + struct.pack("<I", len(texture)) + texture + shader[end:]
         emitter_count = gravity_count = 0
@@ -628,38 +628,19 @@ def preview_bytes(texture_directory: Path = TEXTURES) -> bytes:
                      "Actual DDS RGB and alpha decoded from generated assets. Not a game screenshot.")
 
 def generate() -> tuple[int, int]:
-    sources = sorted(BASE.glob("*.nif"))
-    if len(sources) != 10:
-        raise FormatError(f"Expected ten base colour NIFs, found {len(sources)}")
-    source_data = {}
-    for path in sources:
-        doc = NifDocument.parse(path.read_bytes())
-        for system in particle_systems(doc):
-            for index in system.modifiers:
-                if doc.types[index] == "NiPSysMeshEmitter":
-                    fields = emitter_fields(doc, index, system.index)
-
-                    block = bytearray(doc.blocks[index])
-                    struct.pack_into("<f", block, fields["radius_variation"][0],
-                                     min(fields["radius_variation"][1], fields["radius"][1] * 0.2))
-                    doc.blocks[index] = bytes(block)
-        ensure_motion_controllers(doc)
-        data = doc.serialize()
-        NifDocument.parse(data)
-        path.write_bytes(data)
-        source_data[path.name] = data
+    source = (BASE / "Default.nif").read_bytes()
+    NifDocument.parse(source)
+    if not (TEXTURES / "Default.dds").is_file():
+        raise FormatError("Missing default particle texture")
     TEXTURES.mkdir(parents=True, exist_ok=True)
     for profile in PROFILES:
-        mesh_folder = BASE / "WeaponStyles" / profile.name
-        mesh_folder.mkdir(parents=True, exist_ok=True)
         pixels = texture_pixels(profile)
         (TEXTURES / f"{profile.name}.dds").write_bytes(dds_bytes(pixels))
-        for filename, data in source_data.items():
-            (mesh_folder / filename).write_bytes(variant_bytes(data, profile))
+        (BASE / f"{profile.name}.nif").write_bytes(variant_bytes(source, profile))
     preview = ROOT / "output/weapon-particle-styles.png"
     preview.parent.mkdir(parents=True, exist_ok=True)
     preview.write_bytes(preview_bytes())
-    return len(source_data) * len(PROFILES), len(PROFILES)
+    return len(PROFILES), len(PROFILES)
 
 def inspect_sources() -> None:
     for path in sorted(BASE.glob("*.nif")):

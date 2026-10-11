@@ -122,24 +122,44 @@ namespace Redsand::Weapons
 
 	[[nodiscard]] inline std::string MapMeshPath(std::string_view path, Profile profile)
 	{
-		constexpr std::string_view root = "Effects/WeaponTrails/ElementalDesert/";
+		constexpr std::string_view root = "RedsandParticles/";
+		constexpr std::string_view legacy = "Effects/WeaponTrails/ElementalDesert/";
 		constexpr std::array<std::string_view, 10> colors = {
 			"Blue.nif", "Bound.nif", "DefaultYellow.nif", "Fire.nif", "Frost.nif",
 			"Green.nif", "Purple.nif", "Red.nif", "Shock.nif", "Sun.nif"
 		};
-		const auto folder = ProfileFolder(profile);
-		if (folder.empty() || path.size() <= root.size() ||
-			!detail::EqualMeshPath(path.substr(0, root.size()), root)) {
+		if (profile > Profile::Crossbow) { return std::string(path); }
+		auto filename = path;
+		if (detail::EqualMeshPath(path, "RedsandParticles/Default.nif")) {
+			filename = "DefaultYellow.nif";
+		} else if (path.size() > legacy.size() && detail::EqualMeshPath(path.substr(0, legacy.size()), legacy)) {
+			filename.remove_prefix(legacy.size());
+			constexpr std::string_view styles = "WeaponStyles/";
+			if (filename.size() > styles.size() && detail::EqualMeshPath(filename.substr(0, styles.size()), styles)) {
+				filename.remove_prefix(styles.size());
+				const auto separator = filename.find_first_of("/\\");
+				if (separator == std::string_view::npos) { return std::string(path); }
+				const auto folder = filename.substr(0, separator);
+				bool found = false;
+				for (unsigned value = 1; value <= static_cast<unsigned>(Profile::Crossbow); ++value) {
+					const auto candidate = static_cast<Profile>(value);
+					if (detail::EqualASCII(folder, ProfileFolder(candidate))) {
+						profile = candidate;
+						found = true;
+						break;
+					}
+				}
+				if (!found) { return std::string(path); }
+				filename.remove_prefix(separator + 1);
+			}
+		} else {
 			return std::string(path);
 		}
-		const auto filename = path.substr(root.size());
 		for (const auto color : colors) {
 			if (detail::EqualASCII(filename, color)) {
 				std::string result(root);
-				result += "WeaponStyles/";
-				result += folder;
-				result += '/';
-				result += color;
+				result += profile == Profile::Default ? "Default" : ProfileFolder(profile);
+				result += ".nif";
 				return result;
 			}
 		}
