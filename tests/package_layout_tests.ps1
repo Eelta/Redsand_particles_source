@@ -28,8 +28,7 @@ function IsLegacyAsset([string]$Relative) {
 function IsRuntimeAsset([string]$Relative) {
     if (IsLegacyAsset $Relative) { return $false }
     if ([IO.Path]::GetFileName($Relative) -match '^(LICENSE|COPYING|NOTICE)([. -]|$)') { return $false }
-    return $Relative -eq 'PrecisionParticleMatch.esp' -or
-        $Relative -match '^Meshes[\\/].+\.nif$' -or
+    return $Relative -match '^Meshes[\\/].+\.nif$' -or
         $Relative -match '^Textures[\\/].+\.dds$' -or
         $Relative -match '^SKSE[\\/].+\.(ini|toml)$'
 }
@@ -82,9 +81,9 @@ foreach ($item in Get-ChildItem -LiteralPath $stage -Recurse -Force) {
 Require ($installed.Count -eq $expectedFiles.Count) 'Runtime package file count does not match the runtime asset set and DLL'
 foreach ($relative in $expectedFiles.Keys) { $null = StageFile $relative }
 $pluginsInPackage = @(Get-ChildItem -LiteralPath $stage -Recurse -File | Where-Object { $_.Extension -in @('.esp', '.esm', '.esl') })
-Require ($pluginsInPackage.Count -eq 1 -and $pluginsInPackage[0].FullName -eq (Join-Path $stage 'PrecisionParticleMatch.esp')) 'Package must contain only the main PrecisionParticleMatch.esp'
+Require ($pluginsInPackage.Count -eq 0) 'Redsand must not package ESP, ESM or ESL plugins'
 Require (@(Get-ChildItem -LiteralPath $stage -Recurse -Filter '*.pex' -File).Count -eq 0) 'The runtime menu must not require Papyrus scripts'
-foreach ($required in @('PrecisionParticleMatch.esp', 'SKSE\Plugins\Precision.dll', 'SKSE\Plugins\RedsandParticles.ini', 'SKSE\Plugins\Precision\Precision_ElementalDesert.toml', 'Meshes\Effects\WeaponTrails\ElementalDesert\DefaultYellow.nif', 'Textures\effects\ElementalDesert\circle_05.dds')) {
+foreach ($required in @('SKSE\Plugins\Precision.dll', 'SKSE\Plugins\RedsandParticles.ini', 'SKSE\Plugins\Precision\Precision_ElementalDesert.toml', 'Meshes\Effects\WeaponTrails\ElementalDesert\DefaultYellow.nif', 'Textures\effects\ElementalDesert\circle_05.dds')) {
     Require (Test-Path -LiteralPath (Join-Path $stage $required) -PathType Leaf) "Missing required runtime file: $required"
 }
 $weaponProfiles = @('Sword', 'Dagger', 'WarAxe', 'Mace', 'Greatsword', 'Battleaxe', 'Warhammer', 'Bow', 'Crossbow')
@@ -106,7 +105,7 @@ foreach ($profile in $weaponProfiles) {
     $texture = Join-Path $styleTextureRoot ($profile + '.dds')
     Require (Test-Path -LiteralPath $texture -PathType Leaf) "Missing weapon shape texture: $profile"
 }
-Require ($installed.ContainsKey('PrecisionParticleMatch.esp') -and $installed.ContainsKey('SKSE\Plugins\Precision.dll')) 'Required game files missing from installation'
+Require ($installed.ContainsKey('SKSE\Plugins\Precision.dll')) 'Required game files missing from installation'
 $settings = ReadSettings (StageFile 'SKSE\Plugins\RedsandParticles.ini')
 $defaults = @{
     Menu = @{ Language='English'; DiagnosticLogging='false' }
@@ -171,7 +170,8 @@ print('PASS: 100 packaged NIFs retain private constant speed/radius controllers 
 Require ($LASTEXITCODE -eq 0) 'Packaged NIF/controller validation failed'
 $manifest = Get-Content -LiteralPath $manifestFile -Raw | ConvertFrom-Json
 Require ($manifest.packageFormat -eq 'RuntimeFiles') 'Manifest packageFormat must be RuntimeFiles'
-Require ($manifest.PSObject.Properties.Name -contains 'packageVersion' -and $manifest.packageVersion -eq '0.5.5') 'Manifest packageVersion must be 0.5.5'
+Require ($manifest.PSObject.Properties.Name -contains 'packageVersion' -and $manifest.packageVersion -eq '0.5.6') 'Manifest packageVersion must be 0.5.6'
+Require ($manifest.PSObject.Properties.Name -contains 'redsandESPRequired' -and $manifest.redsandESPRequired -is [bool] -and !$manifest.redsandESPRequired) 'Redsand must not require its legacy ESP'
 Require ($manifest.PSObject.Properties.Name -contains 'independentDiagnosticLog' -and $manifest.independentDiagnosticLog -ceq 'RedsandParticles.log') 'Diagnostics must use the independent RedsandParticles.log file'
 Require ($manifest.PSObject.Properties.Name -contains 'diagnosticLoggingDefault' -and $manifest.diagnosticLoggingDefault -is [bool] -and !$manifest.diagnosticLoggingDefault) 'Diagnostic logging must default to off'
 Require ($manifest.diagnosticLogMode -ceq 'OverwritePerGameSession' -and $manifest.diagnosticLogMaxBytes -eq 8388608) 'Diagnostics must overwrite previous game sessions and cap one file at 8 MiB'
@@ -183,7 +183,7 @@ foreach ($field in @('redsandRealtimeMenu', 'runtimeParticleSettings', 'bowConti
 }
 Require ($manifest.PSObject.Properties.Name -contains 'swordTipAttachment' -and $manifest.swordTipAttachment -eq 2) 'Sword-tip provenance must declare the swept-emitter implementation'
 foreach ($field in @('swordTipSweptEmitter', 'swordEmitterObjectTraversal', 'staffParticlesRemoved', 'swordSpreadControl', 'swordSizeControl', 'bilingualMenu')) {
-    Require ($manifest.PSObject.Properties.Name -contains $field -and $manifest.$field -is [bool] -and $manifest.$field) "Missing 0.5.5 runtime provenance: $field"
+    Require ($manifest.PSObject.Properties.Name -contains $field -and $manifest.$field -is [bool] -and $manifest.$field) "Missing 0.5.6 runtime provenance: $field"
 }
 foreach ($field in @('staffParticles', 'staffIndependentOfBowOptions', 'staffParticleEffects')) {
     Require (-not ($manifest.PSObject.Properties.Name -contains $field)) "Removed staff provenance remains: $field"
@@ -210,4 +210,4 @@ foreach ($property in $manifest.sourceSHA256.PSObject.Properties) {
     Require ($property.Value -match '^[0-9a-fA-F]{64}$' -and $property.Value -eq (Get-FileHash -LiteralPath $sourceFile -Algorithm SHA256).Hash) "Source checksum mismatch: $($property.Name)"
 }
 Require (@(Get-ChildItem -LiteralPath $sourceRoot -Recurse -File).Count -eq @($manifest.sourceSHA256.PSObject.Properties).Count) 'Local build manifest must cover every source file'
-Write-Output 'PASS: 0.5.5 flat runtime files only, nine weapon styles, 100 NIF controller chains, nine DDS shapes, main ESP only, bilingual/melee/bow defaults and local asset/DLL/source provenance'
+Write-Output 'PASS: 0.5.6 flat runtime files only, nine weapon styles, 100 NIF controller chains, nine DDS shapes, no ESP/ESM/ESL, bilingual/melee/bow defaults and local asset/DLL/source provenance'

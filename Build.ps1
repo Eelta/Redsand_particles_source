@@ -283,7 +283,7 @@ try {
     $runtimeAssets = Join-Path $PSScriptRoot 'assets/Basic'
     foreach ($asset in Get-ChildItem -LiteralPath $runtimeAssets -Recurse -File) {
         $relative = $asset.FullName.Substring($runtimeAssets.Length + 1)
-        if ($relative -ne 'PrecisionParticleMatch.esp' -and $relative -notmatch '^(Meshes[\\/].+\.nif|Textures[\\/].+\.dds|SKSE[\\/].+\.(ini|toml))$') { continue }
+        if ($relative -notmatch '^(Meshes[\\/].+\.nif|Textures[\\/].+\.dds|SKSE[\\/].+\.(ini|toml))$') { continue }
         if ($relative -match '[\\/]Density(5|25|50|75)[\\/]' -or $asset.Name -match '^(LICENSE|COPYING|NOTICE)([. -]|$)') { continue }
         $target = [IO.Path]::GetFullPath((Join-Path $stage $relative))
         if (!$target.StartsWith($stage + '\', [StringComparison]::OrdinalIgnoreCase)) { throw 'Runtime asset escaped staging directory.' }
@@ -355,6 +355,7 @@ try {
         bowIndependentOfSwordOptions=$true
         packageType='full'
         packageFormat='RuntimeFiles'
+        redsandESPRequired=$false
         packageVersion=$config.packageVersion
         requiresPreviousRedsand=$false
         bowParticleEffects=@('chargeConvergence', 'releaseRing', 'worldSpaceArrowTrail')

@@ -24,7 +24,7 @@ function Assert-LocalItem([IO.FileSystemInfo]$Item) {
 if ((Get-Item -LiteralPath $workspace -Force).Attributes -band [IO.FileAttributes]::ReparsePoint) {
     throw 'The workspace must not be a linked directory.'
 }
-foreach ($required in @('Build.ps1', 'build.json', 'source/RedsandBowParticles.cpp', 'source/RedsandEmissionTuning.h', 'assets/Basic/PrecisionParticleMatch.esp', 'tests/package_layout_tests.ps1')) {
+foreach ($required in @('Build.ps1', 'build.json', 'source/RedsandBowParticles.cpp', 'source/RedsandEmissionTuning.h', 'assets/Basic/SKSE/Plugins/RedsandParticles.ini', 'tests/package_layout_tests.ps1')) {
     $item = Get-Item -LiteralPath (Join-Path $workspace $required) -Force
     Assert-LocalItem $item
     if ($item.PSIsContainer) { throw "Expected a source file: $required" }
@@ -36,7 +36,8 @@ foreach ($path in $preservedPaths) {
     if (Test-Path -LiteralPath $path) { $preservedHashes[$path] = (Get-FileHash -LiteralPath $path -Algorithm SHA256).Hash }
 }
 $manifest = Get-Content -LiteralPath $manifestPath -Raw | ConvertFrom-Json
-if ($manifest.packageFormat -ne 'RuntimeFiles' -or $manifest.packageVersion -ne '0.5.5' -or
+if ($manifest.packageFormat -ne 'RuntimeFiles' -or $manifest.packageVersion -ne '0.5.6' -or
+    $manifest.redsandESPRequired -ne $false -or
     $manifest.footIKDriverInfoOffset -ne '0x88' -or
     $manifest.footIKFixRuntimes -notcontains 'SE' -or $manifest.footIKFixRuntimes -notcontains 'AE' -or
     $manifest.bowParticlesOptional -ne $true -or $manifest.bowIndependentOfSwordOptions -ne $true -or
@@ -73,7 +74,7 @@ foreach ($asset in Get-ChildItem -LiteralPath $runtimeAssets -Recurse -File) {
     $relative = $asset.FullName.Substring($runtimeAssets.Length + 1).Replace('\', '/')
     if ($relative -match '^Meshes/Effects/WeaponTrails/ElementalDesert/Density(75|50|25|5)/' -or
         $asset.Name -match '^(LICENSE|COPYING|NOTICE)([. -]|$)') { continue }
-    if ($relative -eq 'PrecisionParticleMatch.esp' -or $relative -match '^Meshes/.+\.nif$' -or
+    if ($relative -match '^Meshes/.+\.nif$' -or
         $relative -match '^Textures/.+\.dds$' -or $relative -match '^SKSE/.+\.(ini|toml)$') {
         $expectedEntries[$relative] = $true
     }
