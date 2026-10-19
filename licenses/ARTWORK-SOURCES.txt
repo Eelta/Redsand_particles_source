@@ -1,0 +1,37 @@
+Redsand Particles artwork sources and attribution
+Maintained 2026-10-19. These notices identify resources used by this repository; they do not relicense third-party artwork.
+
+Redsand Particles: Epsilona11.
+The author-provided 1.0.0 baseline already contains the ten weapon particle models and ten weapon textures. The maintained base models retain their geometry, skeleton and particle systems, with four texture-path substitutions per model. The baseline is not presented as proof that every historical upstream contribution was independently authored by this project.
+
+AP05: Separated Slash Effects X / Super Sparks Slash particle templates.
+https://www.nexusmods.com/skyrimspecialedition/mods/99506
+The hit, slash and block particle models include modified AP05 particle structures. Credit the original author and keep redistribution free. The author's instructions allow fixes and compatibility patches without additional permission. Modified geometry, settings, animations and materials do not erase the upstream attribution.
+
+ScholarKeriak: Valhalla combat timed block vfx alternative.
+https://www.nexusmods.com/skyrimspecialedition/mods/177923
+The alternative timed-block ring and star texture are used under the author's credited modification and resource-use permission. Do not sell them. The original Valhalla runtime and other original resources are not bundled.
+
+Kenney: Particle Pack, circle_05.png.
+https://kenney.nl/assets/particle-pack
+CC0. The default particle texture is a converted copy of this source.
+
+tktk: Effekseer Effects vol.2 selected texture resources.
+https://effekseer.github.io/en/contribute.html
+https://effekseer.github.io/en/contributes/tktk02/index.html
+The official example catalogue distributes this collection in its CC0 group. Selected original textures and their conversion records are retained with the corresponding source.
+
+Raffaele Picca / Picster: Godot particle and VFX textures, effect_3.png.
+https://github.com/RPicster/Godot-particle-and-vfx-textures
+CC0. Used for the contact-corona texture.
+
+Effekseer contributors: EffectMaterials, tx_slash01_256.png.
+https://github.com/effekseer/EffectMaterials/tree/8bf8edfedb51ac09af3d4cf788cb81746ea75a82
+https://raw.githubusercontent.com/effekseer/EffectMaterials/8bf8edfedb51ac09af3d4cf788cb81746ea75a82/README.md
+CC0 under the fixed repository's explicit data grant. GoldCutThreads.dds is a lossless conversion of this source, not an original project drawing.
+
+The curved slash masks Crescent, RedTrace and GoldSweepMask are generated from project mathematical shape functions. Their generators reproduce the retained textures byte for byte.
+The block-lightning paths, their travel textures and the replacement refraction shell are independently generated project resources. Their generators do not read third-party refraction models.
+No Stellar Blade game assets are bundled. The game title describes a visual reference.
+
+Code and art licensing are separate. The original Simple Block Sparks artwork is not included. The Praisetheford/AP05 Refraction model is not part of the corrected release payload. Third-party names are credits, not claims of endorsement.

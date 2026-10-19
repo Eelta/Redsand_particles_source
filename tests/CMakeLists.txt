@@ -52,6 +52,12 @@ set_tests_properties(slash_asset_visual_invariants_and_secondary_density PROPERT
 add_test(NAME source_checkout_without_local_publication_docs
     COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/package_optional_docs_tests.py")
 set_tests_properties(source_checkout_without_local_publication_docs PROPERTIES ENVIRONMENT "PYTHONDONTWRITEBYTECODE=1")
+add_test(NAME retained_slash_texture_source_reproduction
+    COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/legacy_mask_sources_tests.py")
+set_tests_properties(retained_slash_texture_source_reproduction PROPERTIES ENVIRONMENT "PYTHONDONTWRITEBYTECODE=1")
+add_test(NAME independently_generated_shockwave_refraction_glow_and_fade
+    COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/shockwave_assets_tests.py")
+set_tests_properties(independently_generated_shockwave_refraction_glow_and_fade PROPERTIES ENVIRONMENT "PYTHONDONTWRITEBYTECODE=1")
 target_compile_definitions(logging_tests PRIVATE REDSAND_LOG_STANDALONE)
 
 

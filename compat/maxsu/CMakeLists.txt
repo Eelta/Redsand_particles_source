@@ -21,6 +21,8 @@ configure_file("${UPSTREAM}/cmake/Version.h.in" "${CMAKE_CURRENT_BINARY_DIR}/inc
 configure_file("${UPSTREAM}/cmake/version.rc.in" "${CMAKE_CURRENT_BINARY_DIR}/version.rc" @ONLY)
 file(GLOB PLUGIN_SOURCES CONFIGURE_DEPENDS "${UPSTREAM}/src/*.cpp")
 add_library(MaxsuBlockSpark SHARED ${PLUGIN_SOURCES} "${CMAKE_CURRENT_BINARY_DIR}/version.rc")
+include("${CMAKE_CURRENT_SOURCE_DIR}/../../cmake/EmbedNotices.cmake")
+redsand_embed_notices(MaxsuBlockSpark "${CMAKE_CURRENT_SOURCE_DIR}/../.." "${DEPS}/share")
 target_include_directories(MaxsuBlockSpark PRIVATE
   "${UPSTREAM}/src" "${CMAKE_CURRENT_BINARY_DIR}/include" "${DKUTIL}/include"
   "${COMMONLIB}/include" "${COMMONLIB}/extern/openvr/headers" "${DEPS}/include")

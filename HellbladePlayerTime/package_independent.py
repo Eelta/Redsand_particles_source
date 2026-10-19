@@ -119,10 +119,27 @@ This package is local only; no GitHub Release, tag or upload was created.
         for name in ("source", "tests", "assets"):
             add_tree(archive, root / name, "HellbladePlayerTime/" + name)
         for name in ("CMakeLists.txt", "package_independent.py", "baseline.json", "upstream-project.json", "BUILDING.md"):
-            archive.write(root / name, "HellbladePlayerTime/" + name)
+            if (root / name).is_file():
+                archive.write(root / name, "HellbladePlayerTime/" + name)
+        archive.write(root.parent / "LICENSE", "LICENSE")
+        add_tree(archive, root.parent / "licenses", "licenses")
+        add_tree(archive, root.parent / "cmake", "cmake")
         add_tree(archive, commonlib, "Dependencies/CommonLibSSE-NG")
+        minhook_candidates = [args.prepared / "MinHook",
+                              args.prepared / "Precision/build-release/_deps/hde64-src",
+                              args.prepared / "Precision/build-release/src/CommonLibSSE/_deps/hde64-src",
+                              root.parent / "ThirdParty/Dependencies/MinHook"]
+        minhook = next((path for path in minhook_candidates
+                        if (path / "src/hde/hde64.c").is_file() and (path / "LICENSE.txt").is_file()), None)
+        if minhook is None:
+            raise RuntimeError("Matching CommonLib Patch Safety decoder source is missing")
+        add_tree(archive, minhook, "Dependencies/MinHook")
         for name in deps:
             candidates = sorted((args.prepared / "vcpkg/buildtrees" / name / "src").glob("*.clean"))
+            if not candidates:
+                retained = root.parent / "ThirdParty/Dependencies" / name
+                if retained.is_dir():
+                    candidates = [retained]
             if len(candidates) != 1:
                 raise RuntimeError(f"Dependency source must be unambiguous: {name}")
             source_dependencies[name] = candidates[0].name

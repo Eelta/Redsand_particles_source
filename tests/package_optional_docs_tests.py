@@ -62,6 +62,11 @@ class PackageOptionalDocsTests(unittest.TestCase):
             root = project / 'HellbladePlayerTime'
             root.mkdir(parents=True)
             shutil.copy2(ROOT / 'HellbladePlayerTime/package_independent.py', root / 'package_independent.py')
+            (project / 'LICENSE').write_text('project license', encoding='utf-8')
+            (project / 'licenses').mkdir()
+            (project / 'licenses/TDM-COPYING.txt').write_text('api license', encoding='utf-8')
+            (project / 'cmake').mkdir()
+            (project / 'cmake/EmbedNotices.cmake').write_text('function(redsand_embed_notices)\nendfunction()\n', encoding='utf-8')
             for folder in ('source', 'tests', 'assets/SKSE/Plugins'):
                 (root / folder).mkdir(parents=True)
             (root / 'source/example.cpp').write_text('int value() { return 3; }', encoding='utf-8')
@@ -77,6 +82,10 @@ class PackageOptionalDocsTests(unittest.TestCase):
             (prepared / 'CommonLibSSE-NG').mkdir(parents=True)
             for name in ('COPYING', 'EXCEPTIONS'):
                 (prepared / 'CommonLibSSE-NG' / name).write_text('retained license', encoding='utf-8')
+            decoder = prepared / 'MinHook'
+            (decoder / 'src/hde').mkdir(parents=True)
+            (decoder / 'src/hde/hde64.c').write_text('int decoder(void) { return 1; }', encoding='utf-8')
+            (decoder / 'LICENSE.txt').write_text('retained decoder license', encoding='utf-8')
             precision = prepared / 'Precision'
             precision.mkdir()
             (precision / 'vcpkg.json').write_text('{}', encoding='utf-8')
@@ -102,6 +111,10 @@ class PackageOptionalDocsTests(unittest.TestCase):
                 self.assertIn('Documentation/CREDITS.txt', archive.namelist())
                 self.assertIn('Documentation/Licenses/fmt-copyright.txt', archive.namelist())
                 self.assertIn('HellbladePlayerTime/source/example.cpp', archive.namelist())
+                self.assertEqual(archive.read('licenses/TDM-COPYING.txt'), b'api license')
+                self.assertIn('cmake/EmbedNotices.cmake', archive.namelist())
+                self.assertIn('Dependencies/MinHook/src/hde/hde64.c', archive.namelist())
+                self.assertEqual(archive.read('Dependencies/MinHook/LICENSE.txt'), b'retained decoder license')
 
     def test_runtime_policy_rejects_unsafe_paths_and_case_collisions(self):
         sys.path.insert(0, str(ROOT / 'tools'))

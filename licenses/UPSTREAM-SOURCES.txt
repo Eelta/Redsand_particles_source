@@ -1,0 +1,46 @@
+Third-party program source attribution
+
+Derivative changes maintained for Redsand Particles, 2026-10-19.
+This file identifies repository-wide sources. Each component retains its own license; listing a component does not mean that its runtime DLL is bundled.
+
+Precision: Ersh / Ershin
+https://github.com/ersh1/Precision
+Revision: 9ef45e0d8d9e3cf8b2df444f05142c1e7bf41cd4
+GPL-3.0 with the retained Modding and Linking Exceptions.
+Local modifications add particle emission and material isolation, independent Precision ribbon compatibility, native impact routing, block lightning, settings and optional menu integration. The modified Precision binary retains the original DLL identity for compatibility.
+
+MaxsuBlockSpark: Maxsu / max-su-2019
+https://github.com/max-su-2019/MaxsuBlockSpark
+Original project source is MIT licensed. Retain Maxsu-original-MIT.txt.
+NG branch: doodlum
+Verified upstream reference: ebce199c099973faf461fe37f6da1eeaa40dc601
+https://github.com/doodlum/MaxsuBlockSpark-ng
+GPL-3.0 with the retained exceptions. Local changes add the Redsand model-selection interface and build adaptation; this is a derivative, not an independently authored replacement.
+DKUtil: DK, MIT; see DKUtil-MIT.txt.
+
+CommonLibSSE-NG: alandtse and contributors
+https://github.com/alandtse/CommonLibSSE-NG
+Revision: 8b032fa992750d654d6d38a33731714d8b86be1f
+GPL-3.0 with the retained Modding and Linking Exceptions.
+
+SKSE Menu Framework API: Thiago099 / QTR-Modding
+https://github.com/QTR-Modding/SKSE-Menu-Framework-3-API
+Revision: 1dcb70179076aae4ab626f43c5baab2735ca5877
+LGPL-2.1. The project uses a reduced ABI adapter; see source/vendor/SOURCE.txt and source/vendor/LICENSE. No framework runtime is redistributed.
+
+True Directional Movement API: Ersh / Ershin
+https://github.com/ersh1/TrueDirectionalMovement
+GPL-3.0 with Modding and Linking Exceptions; see TDM-COPYING.txt and TDM-EXCEPTIONS.txt. The API header is inherited through the Hellblade source baseline; no TDM runtime is redistributed.
+
+Hellblade - Timed Block - AE Support: thisdarkocean / moon_river / Tofunmi
+https://www.nexusmods.com/skyrimspecialedition/mods/87645
+https://gitlab.com/moon_river/hellbladere
+Source baseline: e21165d54fe99a4d3d9e36ea2556fccfba9a55c7
+The author permits credited modification and redistribution. No sale, Donation Points or cross-game conversion. Player Time Independence is a derivative; its local changes and exact source baseline are recorded in HellbladePlayerTime/baseline.json. Do not claim reconstruction of the original 1.3.5.1 binary.
+
+This source attribution does not replace individual licenses and does not relicense third-party artwork. Artwork permission findings are tracked separately from code licensing.
+
+MinHook / Hacker Disassembler Engine 64: Tsuda Kageyu and Vyacheslav Patkov.
+https://github.com/TsudaKageyu/minhook
+Revision: c3fcafdc10146beb5919319d0683e44e3c30d537 (v1.3.4).
+The pinned CommonLib Patch Safety implementation compiles the HDE64 instruction-length decoder. Its complete upstream copyright notices, conditions and disclaimers are retained in MinHook-LICENSE.txt. Matching source is included in the corresponding-source archive. No separate MinHook DLL is redistributed.

@@ -1,0 +1,17 @@
+{
+  "file": "effekseer-tx_slash01_256.png",
+  "upstream_file": "Effects/Textures/tx_slash01_256.png",
+  "project": "Effekseer EffectMaterials",
+  "repository": "https://github.com/effekseer/EffectMaterials",
+  "revision": "8bf8edfedb51ac09af3d4cf788cb81746ea75a82",
+  "source_url": "https://raw.githubusercontent.com/effekseer/EffectMaterials/8bf8edfedb51ac09af3d4cf788cb81746ea75a82/Effects/Textures/tx_slash01_256.png",
+  "sha256": "89294f59052c63b97dfec9b3a043afa0e9f28037d4c71701628ff0f2df3d4544",
+  "license": "CC0-1.0",
+  "license_url": "https://github.com/effekseer/EffectMaterials/blob/8bf8edfedb51ac09af3d4cf788cb81746ea75a82/README.md",
+  "license_statement": "All data are under CC0.",
+  "license_readme_sha256": "174465db405d2dbe9c97b2d3c5b1df607bef6c1905e727dbfb23a641a4a71067",
+  "credit": "Effekseer / KTK_kumamoto, as credited by the fixed upstream repository",
+  "output": "Textures/StellarImpact/Slash/GoldCutThreads.dds",
+  "conversion": "Unchanged source RGBA at the top mip, BGRA8 DDS with alpha-weighted mipmaps",
+  "output_sha256": "df3a5ff7724f225b7e3f6e631c34dd28210015bc65121dd3e4e22c0370bc7ef3"
+}
