@@ -37,6 +37,7 @@ namespace RedsandImpactVFX::Manifest
 			Require(table != nullptr, "Impact route must be a table");
 			Route route;
 			route.plugin = String(*table, "plugin");
+			if (NormalizePath(route.plugin) != "skyrim.esm") { continue; }
 			const auto id = (*table)["form"].value<int64_t>();
 			Require(id && *id > 0 && *id <= 0xFFFFFF, "Invalid local FormID in impact route");
 			route.form = static_cast<std::uint32_t>(*id);

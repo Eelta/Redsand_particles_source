@@ -52,10 +52,10 @@ def main(stage):
     nif_paths = list((stage / "Meshes/StellarImpact").rglob("*.nif"))
     families = ["Hit/StoneBurst.nif", "Hit/MetalBurst.nif", "Slash/AzureCrescentSlash.nif", "Slash/GoldBladeSlash.nif",
                 "Block/NormalBlock.nif", "Block/TimedSparks.nif", "Block/TimedFlare.nif", "Block/PerfectRing.nif", "Block/SimpleTimed.nif", "Refraction/SoftRefraction.nif"]
-    expected_nifs = {"Runtime/Off.nif"} | set(families)
+    expected_nifs = {"Runtime/Off.nif", "Block/StarRing.nif"} | set(families)
     expected_nifs.update(f"Runtime/B{b}D{d}S{s}/{family}" for b in range(4) for d in range(4) for s in range(4) for family in families)
     check({p.relative_to(stage / "Meshes/StellarImpact").as_posix() for p in nif_paths} == expected_nifs,
-          "Expected ten base + 640 preset + one off NIF")
+          "Expected ten base + 640 preset + one off and one private star-ring NIF")
     texture_refs = set()
     for path in nif_paths:
         data = path.read_bytes(); types = nif(data)
@@ -78,18 +78,16 @@ def main(stage):
           "Redsand must not package audio files")
     document = tomllib.loads((stage / "SKSE/Plugins/RedsandImpactVFX.toml").read_text(encoding="utf-8"))
     routes = document["Route"]
-    check(document["schemaVersion"] == 1 and len(routes) == 43, "Wrong route schema/count")
+    check(document["schemaVersion"] == 1 and len(routes) == 26, "Wrong route schema/count")
     check({t: sum(r["type"] == t for r in routes) for t in ("IPCT", "EXPL", "PROJ")} ==
-          {"IPCT": 31, "EXPL": 11, "PROJ": 1}, "Wrong runtime form types")
+          {"IPCT": 26, "EXPL": 0, "PROJ": 0}, "Wrong runtime form types")
     by_form = {(r["plugin"].lower(), r["form"]): r for r in routes}
     check(len(by_form) == len(routes), "Duplicate runtime form route")
     for route in document["Route"]:
+        check(route['plugin'] == 'Skyrim.esm', "External combat form override remains")
         check(len(route["models"]) == 64, "Wrong preset count")
         for i, model in enumerate(route["models"]):
-            if route["type"] == "PROJ":
-                check(route["plugin"] == "Dplay_Block_SparksN.esp" and route["form"] == 0x433F and
-                      route["category"] == "Block" and model == "StellarImpact\\Runtime\\Off.nif", "Wrong projectile suppression scope")
-            else: check(f"\\B{i // 16}D{i // 4 % 4}S{i % 4}\\" in model, "Wrong preset addressing")
+            check(f"\\B{i // 16}D{i // 4 % 4}S{i % 4}\\" in model, "Wrong preset addressing")
             check((stage / "Meshes" / model.replace("\\", "/")).is_file(), "Missing runtime preset")
         if "offModel" in route: check((stage / "Meshes" / route["offModel"].replace("\\", "/")).is_file(), "Missing off effect")
         if route["type"] != "IPCT": check("duration" not in route and "originalDuration" not in route, "Non-IPCT route owns gameplay DATA")
@@ -107,29 +105,12 @@ def main(stage):
               "StellarImpact/Runtime/B2D2S2/" + filename and layer["duration"] == .85,
               "Native layer path/category/duration changed")
         check((stage / "Meshes" / layer["model"].replace("\\", "/")).is_file(), "Missing native layer model")
-    for form in (0x801, 0x809):
-        route = by_form[("separated slash effects x.esp", form)]
-        check(route["category"] == "Slash" and all(m.endswith("\\Slash\\GoldBladeSlash.nif") for m in route["models"]), "Old Slash Effects X path escaped Redsand presets")
-    mapping = json.loads((stage / "SKSE/CoreImpactFramework/StellarImpact.json").read_text(encoding="utf-8"))
-    check(mapping == {"HitMapping": []}, "CIF must not duplicate native slash")
-    allowlist = json.loads((Path(__file__).resolve().parent.parent / "tools/impact_mif_allowlist.json").read_text())
-    check(len(set(allowlist)) == 24, "Wrong MIF allowlist count")
-    actual = {p.relative_to(stage).as_posix() for p in (stage / "SKSE/Plugins/MuImpactFramework").rglob("*") if p.is_file()}
-    check(actual == set(allowlist), "Unexpected/missing MIF overrides")
-    for relative in allowlist:
-        text = (stage / relative).read_text(encoding="utf-8-sig")
-        assignments = dict(re.findall(r"(?im)^\s*([A-Za-z0-9]+)\s*=\s*([^\r\n]+)", text))
-        check(set(assignments) == {"VFX", "Aggressor"}, "MIF compatibility rule owns forms/audio")
-        check(assignments["VFX"].strip() == r"StellarImpact\Runtime\Off.nif", "MIF compatibility rule is not empty")
-        check("IsActor(Skyrim.esm|0x14) AND\nNOT IsActor(Skyrim.esm|0x14)" in text,
-              "MIF compatibility rule can still trigger")
-        check(not re.search(r"(?im)^\s*(ImpactDataSet|Sound1|Sound2|Spell|ArtObject|EffectShader)\s*=", text),
-              "MIF compatibility rule still requires a custom form")
-    check(not (stage / "SKSE/Plugins/MuImpactFramework.ini").exists(), "Redsand must not overwrite global MIF settings")
-    for name in ("Docs/StellarImpact/ArtRework/SelectedAssets.json",
-                 "Docs/StellarImpact/ArtRework/CC0-1.0.txt"):
-        check((stage / name).is_file(), "Missing retained trail/attribution asset: " + name)
-    print(f"PASS: ImpactVFX package: {len(nif_paths)} NIFs, {len(textures)} DDS, 43 optional routes, five native layers, zero plugins/audio")
+    sys.path.insert(0, str(Path(__file__).resolve().parent.parent / 'tools'))
+    from runtime_payload import is_runtime_file
+    files = {p.relative_to(stage).as_posix() for p in stage.rglob('*') if p.is_file()}
+    check(all(is_runtime_file(name) for name in files), "External module or non-runtime file remains")
+    check({name for name in files if name.endswith('.dll')} <= {'SKSE/Plugins/Precision.dll'}, "Bundled combat DLL remains")
+    print(f"PASS: ImpactVFX package: {len(nif_paths)} NIFs, {len(textures)} DDS, 26 vanilla routes, five native layers, zero plugins/audio")
 
 
 if __name__ == "__main__": main(Path(sys.argv[1]))

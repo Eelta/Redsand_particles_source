@@ -4298,18 +4298,6 @@
     "introduced_by": "assistant during subsequent maintenance",
     "original_author_release": "Not attributed to the author's original Redsand release; later additions are the assistant's responsibility to audit"
   },
-  "Meshes/ValhallaCombat/SparksFlareRings.nif": {
-    "sha256": "9216d0c215b816007f11b74a8a5b800bd6b48c047685e0ee8d9d2339a065eba5",
-    "origin": "ScholarKeriak credited resource-use permission; free distribution",
-    "introduced_by": "assistant during subsequent maintenance",
-    "original_author_release": "Not attributed to the author's original Redsand release; later additions are the assistant's responsibility to audit"
-  },
-  "Textures/effects/Scholar Keriak/SKK_HitStar.dds": {
-    "sha256": "2fefff48af8c2033458b509025d025b6d5f51101996c289f4d560737cba30aea",
-    "origin": "ScholarKeriak credited resource-use permission; free distribution",
-    "introduced_by": "assistant during subsequent maintenance",
-    "original_author_release": "Not attributed to the author's original Redsand release; later additions are the assistant's responsibility to audit"
-  },
   "Textures/RedsandParticles/Battleaxe.dds": {
     "sha256": "f305587d45f7e8413ecc9e7e1012eed49fd14ec88fdc81349a09973d5e4f96d6",
     "origin": "Epsilona11 procedural weapon texture (generator byte verified)",
@@ -4464,5 +4452,21 @@
   "Textures/RedsandBlockLightning/Travel.dds": {
     "sha256": "3331fcfa095f2de6011465239b7792255d407b4a8e26872c3f94daab6d4f0823",
     "origin": "Original stationary emissive core-only 3D paths / white alpha travel profile; tools/build_block_lightning.py; project license; no outer halo mesh or borrowed art"
+  },
+  "Meshes/StellarImpact/Block/StarRing.nif": {
+    "sha256": "abfdf721c1a1eb5faefd0ddb23bfb61c880e7c3f9e0ae7564ddddf81ba5c2b40",
+    "origin": "ScholarKeriak credited resource-use permission; free distribution",
+    "introduced_by": "assistant during subsequent maintenance",
+    "original_author_release": "Not attributed to the author's original Redsand release; later additions are the assistant's responsibility to audit",
+    "relocated_from": "Meshes/ValhallaCombat/SparksFlareRings.nif",
+    "runtime_dependency": "None; Redsand-native block style using private model and texture paths"
+  },
+  "Textures/StellarImpact/StarRing.dds": {
+    "sha256": "2fefff48af8c2033458b509025d025b6d5f51101996c289f4d560737cba30aea",
+    "origin": "ScholarKeriak credited resource-use permission; free distribution",
+    "introduced_by": "assistant during subsequent maintenance",
+    "original_author_release": "Not attributed to the author's original Redsand release; later additions are the assistant's responsibility to audit",
+    "relocated_from": "Textures/effects/Scholar Keriak/SKK_HitStar.dds",
+    "runtime_dependency": "None; Redsand-native block style using private model and texture paths"
   }
 }

@@ -10,7 +10,7 @@ The hit, slash and block particle models include modified AP05 particle structur
 
 ScholarKeriak: Valhalla combat timed block vfx alternative.
 https://www.nexusmods.com/skyrimspecialedition/mods/177923
-The alternative timed-block ring and star texture are used under the author's credited modification and resource-use permission. Do not sell them. The original Valhalla runtime and other original resources are not bundled.
+The star-ring model and star texture are kept under Redsand-private paths and used under the author's credited modification and resource-use permission. Do not sell them. No Valhalla runtime, records or same-path replacement is bundled. This artwork does not require Valhalla to play.
 
 Kenney: Particle Pack, circle_05.png.
 https://kenney.nl/assets/particle-pack

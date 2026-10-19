@@ -60,23 +60,31 @@ namespace RedsandMenu
 			Describe(help, config, description);
 		}
 
-		void ValhallaRing(RedsandSettings::Config& config, const char*& description)
+		void BlockStyle(RedsandSettings::Config& config, const char*& description)
 		{
-			const Label label{ { "Keep Valhalla block ring", "保留 Valhalla 格挡圆环" }, "preserveValhallaRing" };
-			const Text help{ "Keep the installed Valhalla perfect-block ring. Its size, glow and color come from its own resource. Uncheck to use the adjustable Redsand ring.",
-				"保留 Valhalla 完美格挡圆环，大小、亮度和颜色由该资源决定；关闭后使用可调的红沙圆环。" };
 			const auto state = RedsandImpactVFX::GetStatus();
-			auto* handler = RE::TESDataHandler::GetSingleton();
-			const bool available = state.availability == RedsandImpactVFX::Availability::Ready && state.valhallaRingControlled && handler &&
-				handler->LookupForm<RE::BGSExplosion>(0x60C32, "ValhallaCombat.esp");
-			if (available) { Checkbox(label, config.preserveValhallaRing, config, help, description); return; }
-			if (menu.BeginDisabled && menu.EndDisabled) {
-				menu.BeginDisabled(true);
-				auto display = config.preserveValhallaRing;
-				menu.Checkbox(label.Get(config).c_str(), &display);
-				menu.EndDisabled();
+			const bool available = state.availability == RedsandImpactVFX::Availability::Ready && state.blockAvailable;
+			const bool canDisable = menu.BeginDisabled && menu.EndDisabled;
+			const Label label{ { "Block style", "格挡样式" }, "blockStyle" };
+			if (available || canDisable) {
+				if (canDisable) { menu.BeginDisabled(!available); }
+				auto selected = static_cast<int>(config.blockStyle);
+				const auto* choices = config.language == RedsandSettings::Language::Chinese ?
+					"普通火花\0密集火花\0闪光\0圆环\0线状火花\0星芒圆环\0" : "Sparks\0Dense sparks\0Flash\0Ring\0Line sparks\0Star ring\0";
+				if (menu.Combo(label.Get(config).c_str(), &selected, choices, -1) && available) {
+					config.blockStyle = static_cast<RedsandSettings::BlockStyle>(selected);
+					SaveNow(config);
+				}
+				if (canDisable) { menu.EndDisabled(); }
 			} else { menu.TextUnformatted(label.text.Get(config), nullptr); }
-			menu.TextUnformatted(Text{ "Requires Valhalla Combat and the Redsand block-effects component.", "需要启用 Valhalla Combat，并安装红沙格挡效果组件。" }.Get(config), nullptr);
+			Describe(config.blockStyle == RedsandSettings::BlockStyle::StarRing ?
+				Text{ "The star ring uses a fixed particle count. Color, brightness and size remain adjustable. Changes apply to the next block and do not change block timing or damage.",
+					"星芒圆环的粒子数量固定，颜色、亮度和尺寸可调整。下次格挡生效，不改变判定或伤害。" } :
+				Text{ "Choose the visual shown on successful blocks. Changes apply to the next block and do not change block timing or damage. Missing styles use the default sparks.",
+					"选择成功格挡时的外观，下次格挡生效，不改变判定或伤害。样式资源缺失时使用普通火花。" }, config, description);
+			if (!available) {
+				menu.TextUnformatted(Text{ "Install the block-effects component to choose a style.", "安装格挡特效组件后可选择样式。" }.Get(config), nullptr);
+			}
 		}
 
 		void Color(Label label, RedsandSettings::ColorTarget target, RedsandSettings::Config& config, const char*& description)
@@ -210,8 +218,9 @@ namespace RedsandMenu
 						{ "When a blade hits a character, show a cut of light and sparks along the swing direction. Can be combined with hit sparks.",
 						  "刃器命中角色时，沿挥击方向显示切光与火花，可与命中火花同时开启。" }, description);
 					Checkbox({ { "Block effects", "格挡特效" }, "impactBlock" }, config.impactBlock, config,
-						{ "Replace supported block visuals without changing timing or damage. Timed and perfect blocks require a combat mod that provides them.",
-						  "替换受支持的格挡效果，不改变判定或伤害；限时与完美格挡需对应战斗模组提供判定。" }, description);
+						{ "Show the selected sparks or flash when an attack is blocked. Does not change block timing or damage.",
+						  "成功挡住攻击时显示所选火花或闪光，不改变格挡判定或伤害。" }, description);
+					BlockStyle(config, description);
                     if (Fold({ { "Block lightning", "格挡闪电" }, "blockLightningOptions" }, config)) {
                         Checkbox({ { "Add lightning on player blocks", "玩家格挡叠加闪电" }, "blockLightning" }, config.blockLightning, config,
                             { "Add expanding 3D arcs when you successfully block a hit. Keeps existing block effects, sounds and slowdown unchanged. NPC blocks do not trigger it.",
@@ -291,9 +300,6 @@ namespace RedsandMenu
 					Color({ { "Cut of light", "切光颜色" }, "cutRGB" }, RedsandSettings::ColorTarget::Cut, config, description);
 					Color({ { "Block effects", "格挡特效颜色" }, "blockRGB" }, RedsandSettings::ColorTarget::Block, config, description);
 					Color({ { "Shockwave rim", "冲击波边缘颜色" }, "waveRGB" }, RedsandSettings::ColorTarget::Wave, config, description);
-					if (Fold({ { "Combat mod compatibility", "战斗模组兼容" }, "impactAdvanced" }, config)) {
-						ValhallaRing(config, description);
-					}
 					const auto state = RedsandImpactVFX::GetStatus();
 					if (state.availability != RedsandImpactVFX::Availability::Ready) {
 						const auto unavailable = state.availability == RedsandImpactVFX::Availability::InvalidRoutes ?
@@ -312,11 +318,9 @@ namespace RedsandMenu
 				const auto state = RedsandImpactVFX::GetStatus();
 				const auto summary = std::string(Text{ "Available effects: ", "可用效果：" }.Get(config)) +
 					std::to_string(state.resolved) + "/" + std::to_string(state.definitions) +
-					Text{ "  Optional effects absent: ", "  可选效果未安装：" }.Get(config) + std::to_string(state.missing) +
+					Text{ "  Missing game records: ", "  游戏记录缺失：" }.Get(config) + std::to_string(state.missing) +
 					Text{ "  Conflicts: ", "  覆盖冲突：" }.Get(config) + std::to_string(state.conflicts);
 				menu.TextUnformatted(summary.c_str(), nullptr);
-				menu.TextUnformatted(Text{ "Optional effects may be absent when their combat mods are not installed.",
-					"未安装相应战斗模组时，可选效果缺少属于正常情况。" }.Get(config), nullptr);
 				if (state.resourceFailures || state.wrongTypes) {
 					const auto failures = std::string(Text{ "Missing model resources: ", "模型资源不可用：" }.Get(config)) + std::to_string(state.resourceFailures) +
 						Text{ "  Incompatible records: ", "  不兼容记录：" }.Get(config) + std::to_string(state.wrongTypes);

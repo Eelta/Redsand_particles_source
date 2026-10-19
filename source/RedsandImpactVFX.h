@@ -33,7 +33,7 @@ namespace RedsandImpactVFX
 		bool worldCallback = false;
 		bool arrowCallback = false;
 		std::size_t nativeResolved = 0;
-		bool valhallaRingControlled = false;
+		bool blockAvailable = false;
 		std::uint64_t nativeBlocks = 0;
 		std::uint64_t nativeWorldHits = 0;
 		std::uint64_t nativeArrowHits = 0;

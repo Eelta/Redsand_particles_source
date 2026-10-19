@@ -59,12 +59,11 @@ foreach ($asset in Get-ChildItem -LiteralPath $runtimeAssets -Recurse -File) {
 }
 $impactAssets = Join-Path $assets 'ImpactVFX'
 $impactFiles = @{}
-$impactMifFiles = @(Get-Content -LiteralPath (Join-Path (Split-Path -Parent $PSScriptRoot) 'tools/impact_mif_allowlist.json') -Raw | ConvertFrom-Json)
-$impactCompatFiles = @(Get-Content -LiteralPath (Join-Path (Split-Path -Parent $PSScriptRoot) 'tools/impact_compat_allowlist.json') -Raw | ConvertFrom-Json)
 if (Test-Path -LiteralPath $impactAssets -PathType Container) {
     foreach ($asset in Get-ChildItem -LiteralPath $impactAssets -Recurse -File) {
         $relative = $asset.FullName.Substring($impactAssets.Length + 1)
-        Require ($relative -match '^(SKSE[\\/]CoreImpactFramework[\\/]StellarImpact\.json|SKSE[\\/]Plugins[\\/]RedsandImpactVFX\.toml|Meshes[\\/]StellarImpact[\\/].+\.nif|Textures[\\/]StellarImpact[\\/].+\.dds|Docs[\\/]StellarImpact[\\/](README-zh-CN|CREDITS)\.md)$' -or $relative.Replace('\', '/') -in $impactMifFiles -or $relative.Replace('\', '/') -in $impactCompatFiles) "Unapproved ImpactVFX module path: $relative"
+        if ($relative -match '^Docs[\\/]') { continue }
+        Require ($relative -match '^(SKSE[\\/]Plugins[\\/]RedsandImpactVFX\.toml|Meshes[\\/]StellarImpact[\\/].+\.nif|Textures[\\/]StellarImpact[\\/].+\.dds)$') "Unapproved ImpactVFX module path: $relative"
         Require (-not $expectedFiles.ContainsKey($relative)) "ImpactVFX module overwrites a Basic asset: $relative"
         $impactFiles[$relative] = $asset.FullName
         $expectedFiles[$relative] = $asset.FullName
@@ -124,7 +123,7 @@ $defaults = @{
     Menu = @{ Language='English'; DiagnosticLogging='false' }
     SwordParticles = @{ Enabled='true'; Player='true'; NPC='true'; Tip='true'; KeepPrecisionTrail='true'; Brightness='1'; Density='1'; Spread='1'; Size='1' }
     BowParticles = @{ Enabled='true'; Player='true'; NPC='true'; Brightness='1'; Density='1'; Gathering='true'; Rings='true'; Trails='true' }
-    ImpactVFX = @{ Enabled='true'; Hit='true'; Slash='true'; RandomSlashColor='false'; RandomSlashValues='false'; RandomSlashRange='0.5'; Block='true'; PreserveValhallaRing='true'; Brightness='1'; Density='1'; Size='1'; SlashDistance='1'; SlashSpread='1'; SlashDensity='1'; CutLength='1' }
+    ImpactVFX = @{ Enabled='true'; Hit='true'; Slash='true'; RandomSlashColor='false'; RandomSlashValues='false'; RandomSlashRange='0.5'; Block='true'; BlockStyle='0'; Brightness='1'; Density='1'; Size='1'; SlashDistance='1'; SlashSpread='1'; SlashDensity='1'; CutLength='1' }
     BlockLightning = @{ Enabled='false'; RandomTrigger='true'; Chance='0.10'; RandomColor='false'; Brightness='1'; Size='1'; R='0.12'; G='0.58'; B='1' }
 }
 $defaults['Color.Melee'] = @{ Enabled='false'; R='0.0384615'; G='0.123077'; B='1' }
@@ -214,7 +213,9 @@ Require ($manifest.PSObject.Properties.Name -contains 'keepPrecisionTrailDefault
 Require ($manifest.impactVFXControls -eq 3 -and $manifest.impactVFXContinuous -eq $true) 'Missing continuous impact runtime-control provenance'
 Require (($manifest.impactVFXBrightnessRange -join ',') -eq '0,20' -and ($manifest.impactVFXDensityRange -join ',') -eq '0,10' -and ($manifest.impactVFXSizeRange -join ',') -eq '0.05,10') 'Continuous control range mismatch'
 Require ($manifest.impactVFXNativeMeasuredSlash -eq 1) 'Native measured slash must be declared'
-Require (($manifest.impactVFXModelRouteTypes -join ',') -eq 'IPCT,EXPL,PROJ') 'Impact route type provenance is incomplete'
+Require (($manifest.impactVFXModelRouteTypes -join ',') -eq 'IPCT') 'Impact route type provenance is incomplete'
+Require (($manifest.impactVFXRoutePlugins -join ',') -eq 'Skyrim.esm') 'Impact routes must only address vanilla forms'
+Require (-not $manifest.bundledCombatPlugins -and -not $manifest.overwritesOtherCombatMods) 'Combat module bundles or overrides must not remain'
 Require (($manifest.impactVFXDefaultLevels -join ',') -eq '2,2,2') 'Impact controls must default to B2D2S2'
 Require (($manifest.impactVFXBrightnessLevels -join ',') -eq '0.1,0.5,1,12') 'Incorrect brightness level labels'
 Require (($manifest.impactVFXDensityLevels -join ',') -eq '0.1,0.5,1,6') 'Incorrect density level labels'

@@ -17,6 +17,11 @@ namespace RedsandImpactVFX
 	enum class Kind { Impact, Explosion, Projectile };
 	enum class NativeLayer : unsigned { Hit, Stone, Slash, Block, Wave, Count };
 	inline constexpr std::array<std::string_view, 5> nativeLayerNames{ "Hit", "Stone", "Slash", "Block", "Wave" };
+	inline constexpr std::array<std::string_view, static_cast<unsigned>(RedsandSettings::BlockStyle::Count)> blockStyleModelNames{
+		"NormalBlock.nif", "TimedSparks.nif", "TimedFlare.nif", "PerfectRing.nif", "SimpleTimed.nif", "StarRing.nif"
+	};
+	using BlockStyleModels = std::array<std::string, blockStyleModelNames.size()>;
+	using BlockStyleAvailability = std::array<bool, blockStyleModelNames.size()>;
 	struct NativeRoute
 	{
 		NativeLayer layer = NativeLayer::Hit;
@@ -70,7 +75,7 @@ namespace RedsandImpactVFX
 
 	inline bool ValidRoute(const Route& route)
 	{
-		if (route.plugin.empty() || route.plugin.size() > 255 || route.plugin.find_first_of("/\\:\0", 0, 4) != std::string::npos ||
+		if (NormalizePath(route.plugin) != "skyrim.esm" ||
 			route.form == 0 || route.form > 0xFFFFFF || !ValidModelPath(route.baseModel) ||
 			(!route.originalModel.empty() && !ValidModelPath(route.originalModel)) ||
 			(!route.offModel.empty() && !ValidModelPath(route.offModel)) ||
@@ -83,6 +88,26 @@ namespace RedsandImpactVFX
 	{
 		return static_cast<unsigned>(route.layer) < nativeLayerNames.size() && ValidModelPath(route.model) &&
 			std::isfinite(route.duration) && route.duration > 0.f && route.duration <= 30.f;
+	}
+	inline BlockStyleModels BlockStyleModelPaths(const NativeRoute& route)
+	{
+		BlockStyleModels models;
+		if (route.layer != NativeLayer::Block || !ValidNativeRoute(route)) { return models; }
+		const auto separator = route.model.find_last_of("/\\");
+		const auto directory = separator == std::string::npos ? std::string{} : route.model.substr(0, separator + 1);
+		for (std::size_t index = 0; index < models.size(); ++index) { models[index] = directory + std::string(blockStyleModelNames[index]); }
+		models[0] = route.model;
+		models[static_cast<unsigned>(RedsandSettings::BlockStyle::StarRing)] = "StellarImpact/Block/StarRing.nif";
+		return models;
+	}
+	inline unsigned BlockStyleIndex(RedsandSettings::BlockStyle style, const BlockStyleAvailability& available)
+	{
+		const auto index = static_cast<unsigned>(style);
+		return index < available.size() && available[index] ? index : 0;
+	}
+	inline float BlockStyleDuration(float duration, unsigned selectedStyle)
+	{
+		return selectedStyle == static_cast<unsigned>(RedsandSettings::BlockStyle::StarRing) ? std::max(duration, 2.f) : duration;
 	}
 
 	inline int ModelIndex(const RedsandSettings::Config&)
@@ -120,30 +145,11 @@ namespace RedsandImpactVFX
 		const auto layer = blocked ? NativeLayer::Block : actorTarget ? NativeLayer::Hit : NativeLayer::Stone;
 		return Enabled(NativeCategory(layer), config) ? std::optional<NativeLayer>{ layer } : std::nullopt;
 	}
-	inline const char* NativeBlockIntegrationModel(const NativeRoute* route, bool initialized,
-		const RedsandSettings::Config& config) noexcept
-	{
-		return initialized && route && route->layer == NativeLayer::Block && Enabled(Category::Block, config) ? route->model.c_str() : nullptr;
-	}
-	inline const char* NativeBlockBridgeModel(const NativeRoute* route, bool initialized, bool suppressDuplicate,
-		const RedsandSettings::Config& config) noexcept
-	{
-		const auto* model = NativeBlockIntegrationModel(route, initialized, config);
-		return model && suppressDuplicate ? "StellarImpact\\Runtime\\Off.nif" : model;
-	}
 	inline bool NativeWorldFallbackRequired(std::size_t expected, std::size_t controlled)
 	{
 
 
 		return expected < 26 || controlled != expected;
-	}
-
-	inline const char* BlockIntegrationModel(const Route* route, bool initialized, bool owned,
-		const RedsandSettings::Config& config) noexcept
-	{
-		if (!initialized || !owned || !route || route->kind != Kind::Impact || route->category != Category::Block ||
-			!Enabled(Category::Block, config)) { return nullptr; }
-		return route->models[ModelIndex(config)].c_str();
 	}
 
 	inline const std::string& DisabledModel(const Route& route) { return route.offModel.empty() ? route.originalModel : route.offModel; }
@@ -191,13 +197,12 @@ namespace RedsandImpactVFX
 	inline Decision Plan(const Route& route, const Ownership& ownership, std::string_view currentModel,
 		float currentDuration, const RedsandSettings::Config& config)
 	{
+		if (NormalizePath(route.plugin) != "skyrim.esm") { return {}; }
 		if (ownership.conflicted || NormalizePath(currentModel) != NormalizePath(ownership.lastModel) ||
 			(route.kind == Kind::Impact && currentDuration != ownership.lastDuration)) { return { true }; }
 		const bool enabled = Enabled(route.category, config);
 		Decision result;
-		const bool preserveRing = config.preserveValhallaRing && route.kind == Kind::Explosion &&
-			route.form == 0x60C32 && NormalizePath(route.plugin) == "valhallacombat.esp";
-		result.model = enabled && !preserveRing ? route.models[ModelIndex(config)] : DisabledModel(route);
+		result.model = enabled ? route.models[ModelIndex(config)] : DisabledModel(route);
 		result.duration = enabled ? route.duration : route.originalDuration;
 		result.write = NormalizePath(currentModel) != NormalizePath(result.model) ||
 			(route.kind == Kind::Impact && currentDuration != result.duration);

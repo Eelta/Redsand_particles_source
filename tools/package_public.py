@@ -19,6 +19,10 @@ def source_files(root):
         relative = p.relative_to(root)
         if relative.parts[0].casefold() == 'hellbladeplayertime':
             continue
+        folded = tuple(part.casefold() for part in relative.parts)
+        if folded[:2] == ('compat', 'maxsu') or folded[:3] in {
+                ('compat', 'vendor', 'maxsublockspark-ng'), ('compat', 'vendor', 'dkutil-maxsu')}:
+            continue
         if p.name in private_names or p.name.startswith('.redsand-') or any(part in excluded_dirs for part in relative.parts):
             continue
         if p.is_symlink():
@@ -42,7 +46,6 @@ def main():
     with zipfile.ZipFile(args.archive) as runtime:
         assert len(runtime.namelist()) == len(set(runtime.namelist()))
         precision = runtime.read('SKSE/Plugins/Precision.dll')
-        maxsu = runtime.read('SKSE/Plugins/MaxsuBlockSpark.dll')
     source_hashes = {p.relative_to(root / 'source').as_posix(): sha(p.read_bytes())
                      for p in sorted((root / 'source').rglob('*')) if p.is_file()}
     if 'sourceSHA256' in manifest:
@@ -55,7 +58,8 @@ def main():
         'precision_revision': manifest.get('precisionCommit'),
         'commonlib_revision': manifest.get('commonLibCommit'),
     }
-    provenance.update(current_precision_dll_sha256=sha(precision), current_maxsu_dll_sha256=sha(maxsu),
+    provenance.pop('current_maxsu_dll_sha256', None)
+    provenance.update(current_precision_dll_sha256=sha(precision),
                       current_native_source_sha256=source_hashes,
                       source_delivery='Separate corresponding-source archive; runtime ZIP contains only game files',
                       dp_enabled=False)

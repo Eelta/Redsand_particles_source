@@ -53,15 +53,6 @@ def variant_manifest(original, flags):
     return (header + ''.join(selected)).encode('utf-8')
 
 
-def part_for(name):
-    if name.startswith('SKSE/Plugins/MuImpactFramework/'):
-        return 'Block' if Path(name).name.startswith('blocking_') else 'Hit'
-    if name in {'SKSE/Plugins/MaxsuBlockSpark.dll', 'Meshes/ValhallaCombat/SparksFlareRings.nif',
-                'Textures/effects/Scholar Keriak/SKK_HitStar.dds'}:
-        return 'Block'
-    return None
-
-
 def sub(parent, tag, text=None, **attributes):
     element = ET.SubElement(parent, tag, attributes)
     if text is not None:
@@ -102,8 +93,6 @@ def config_xml():
         for name, value in flags.items():
             sub(dependencies, 'flagDependency', flag=name, value=value)
         sub(sub(item, 'files'), 'folder' if folder else 'file', source=source, destination=destination, priority='10')
-    for component in ('Hit', 'Block'):
-        pattern({component.lower(): 'on'}, 'Compatibility/' + component, '', folder=True)
     for bits in itertools.product(('on', 'off'), repeat=3):
         flags = dict(zip(('hit', 'slash', 'block'), bits))
         pattern(flags, 'Options/impacts-' + '-'.join(bits) + '.toml', MANIFEST)
@@ -130,8 +119,7 @@ def main():
         for name, data in runtime.items():
             if name in {INI, MANIFEST}:
                 continue
-            part = part_for(name)
-            z.writestr(('Compatibility/' + part if part else 'Core') + '/' + name, data)
+            z.writestr('Core/' + name, data)
         z.writestr('fomod/ModuleConfig.xml', config_xml())
         info = ET.Element('fomod')
         for name, value in [('Name', 'Redsand Particles'), ('Author', 'Epsilona11'),
@@ -146,7 +134,8 @@ def main():
             flags = dict(zip(('hit', 'slash', 'block'), bits))
             z.writestr('Options/impacts-' + '-'.join(bits) + '.toml', variant_manifest(runtime[MANIFEST], flags))
     manifest.update(installerArchive=args.output.name, installerSHA256=sha(args.output.read_bytes()),
-                    installerVariants=8, installerFormat='FOMOD 5', installerHandlesKnownOverlap=True)
+                    installerVariants=8, installerFormat='FOMOD 5', installerHandlesKnownOverlap=False,
+                    bundledCombatPlugins=False, overwritesOtherCombatMods=False)
     args.manifest.write_text(json.dumps(manifest, indent=2) + '\n', encoding='utf-8')
     print(json.dumps({'installer': str(args.output), 'variants': 8, 'sha256': manifest['installerSHA256']}))
 

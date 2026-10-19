@@ -52,6 +52,7 @@ namespace RedsandSettings
 				return std::isfinite(value) ? std::clamp(value, minimum, maximum) : fallback;
 			};
 			if (config.language != Language::English && config.language != Language::Chinese) { config.language = Language::English; }
+			if (config.blockStyle >= BlockStyle::Count) { config.blockStyle = BlockStyle::NormalBlock; }
 			config.swordBrightness = valid(config.swordBrightness, maxBrightness);
 			config.swordDensity = valid(config.swordDensity, maxDensity);
 			config.swordSpread = valid(config.swordSpread, maxSpread, 0.0f, defaultSpread);
@@ -117,6 +118,16 @@ namespace RedsandSettings
 			if (parsed.ec == std::errc{} && parsed.ptr == value.data() + value.size()) { output = levels[std::clamp(result, 0, 3)]; }
 		}
 
+		void ReadBlockStyle(std::string_view value, BlockStyle& output)
+		{
+			if (value.empty()) { return; }
+			unsigned result = 0;
+			const auto parsed = std::from_chars(value.data(), value.data() + value.size(), result);
+			if (parsed.ec == std::errc{} && parsed.ptr == value.data() + value.size() && result < static_cast<unsigned>(BlockStyle::Count)) {
+				output = static_cast<BlockStyle>(result);
+			}
+		}
+
 		Config Read(std::istream& input)
 		{
 			Config result;
@@ -168,7 +179,7 @@ namespace RedsandSettings
 					else if (key == "randomslashvalues") { ReadBool(value, result.slashRandomValues); }
 					else if (key == "randomslashrange") { ReadFloat(value, result.slashRandomRange); }
 					else if (key == "block") { ReadBool(value, result.impactBlock); }
-					else if (key == "preservevalhallaring") { ReadBool(value, result.preserveValhallaRing); }
+					else if (key == "blockstyle") { ReadBlockStyle(value, result.blockStyle); }
 					else if (key == "brightnesslevel") { ReadLevel(value, result.impactBrightness, impactBrightnessLevels); }
 					else if (key == "densitylevel") { ReadLevel(value, result.impactDensity, impactDensityLevels); }
 					else if (key == "sizelevel") { ReadLevel(value, result.impactSize, impactSizeLevels); }
@@ -251,7 +262,7 @@ namespace RedsandSettings
 					<< "RandomSlashValues=" << config.slashRandomValues << '\n'
 					<< "RandomSlashRange=" << config.slashRandomRange << '\n'
 					<< "Block=" << config.impactBlock << '\n'
-					<< "PreserveValhallaRing=" << config.preserveValhallaRing << '\n'
+					<< "BlockStyle=" << static_cast<unsigned>(config.blockStyle) << '\n'
 					<< "Brightness=" << config.impactBrightness << '\n'
 					<< "Density=" << config.impactDensity << '\n'
 					<< "Size=" << config.impactSize << '\n'

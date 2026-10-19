@@ -70,26 +70,6 @@ void UnavailableModelsOnlySkipAffectedRoutes()
 	Check(FirstUnavailableModel(broken, cache, probe).has_value(), "route admitted without its restoration model");
 }
 
-void BlockIntegrationNeverCachesOrLeaksDisabledModels()
-{
-	auto route = Fixture(Kind::Impact, Category::Block);
-	RedsandSettings::Config config;
-	Check(BlockIntegrationModel(&route, true, true, config) == route.models[42].c_str(), "integration must expose stable selected route storage");
-	config.impactBrightness = 3; config.impactDensity = 1; config.impactSize = 0;
-	Check(BlockIntegrationModel(&route, true, true, config) == route.models[42].c_str(), "integration cached an old menu preset");
-	Check(!BlockIntegrationModel(&route, false, true, config), "integration exposed uninitialized routes");
-	Check(!BlockIntegrationModel(&route, true, false, config), "integration ignored ownership conflict");
-	Check(!BlockIntegrationModel(nullptr, true, true, config), "integration exposed a missing route");
-	config.impactBlock = false; Check(!BlockIntegrationModel(&route, true, true, config), "block switch does not restore integration fallback");
-	config.impactBlock = true; config.impactEnabled = false;
-	Check(!BlockIntegrationModel(&route, true, true, config), "master switch does not restore integration fallback");
-	config.impactEnabled = true; config.impactHit = false; config.impactSlash = false;
-	Check(BlockIntegrationModel(&route, true, true, config), "unrelated category disabled block integration");
-	route.category = Category::Hit; Check(!BlockIntegrationModel(&route, true, true, config), "integration admitted a hit route");
-	route.category = Category::Block; route.kind = Kind::Projectile;
-	Check(!BlockIntegrationModel(&route, true, true, config), "integration admitted suppression-only projectile route");
-}
-
 void NativeDisableRestoreAndReenable()
 {
 	auto route = Fixture();
@@ -221,23 +201,25 @@ void ManifestParserRejectsBadAndDuplicateRoutes()
 	write("schemaVersion=1\n" + projectile);
 	const auto projectileRoutes = Manifest::ReadRoutes(path);
 	Check(projectileRoutes.size() == 1 && projectileRoutes[0].kind == Kind::Projectile, "PROJ parser failed");
-}
-
-void InstalledValhallaRingCanBeRestoredIndependently()
-{
-	auto route=Fixture(Kind::Explosion,Category::Block);
-	route.plugin="ValhallaCombat.esp";route.form=0x60C32;
-	RedsandSettings::Config config; config.preserveValhallaRing=false;
-	config.preserveValhallaRing=true;
-	Ownership owned{route.models[42],0,false};
-	auto keep=Plan(route,owned,owned.lastModel,0,config);
-	Check(keep.model==route.originalModel && keep.write,"installed Valhalla replacer was bypassed");
-	Commit(owned,keep);
-	config.preserveValhallaRing=false;
-	auto custom=Plan(route,owned,owned.lastModel,0,config);
-	Check(custom.model==route.models[42] && custom.write,"adjustable Redsand ring could not be reenabled");
-	route.form=0x60C31;config.preserveValhallaRing=true;
-	Check(Plan(route,owned,owned.lastModel,0,config).model==route.models[42],"preserving ring suppressed timed-block flare");
+	std::string legacy = "schemaVersion=1\n" + section;
+	RedsandSettings::Config config;
+	for (const auto* plugin : { "ValhallaCombat.esp", "CIF - HitSpark.esp", "Dplay_Block_SparksN.esp", "SCSI-HardCombatBase.esp",
+		"SCSI-PerksOfSkyrim.esp", "SekiroCombat_II.esp", "SimpleTimedBlock.esp", "separated Slash Effects X.esp", "Other.esp" }) {
+		legacy += "\n[[Route]]\nplugin='" + std::string(plugin) + "'\nmodels=[]\n";
+		auto foreign = Fixture(); foreign.plugin = plugin;
+		Check(!ValidRoute(foreign), "external combat record admitted for control");
+		Ownership owned{ foreign.originalModel, foreign.originalDuration };
+		const auto decision = Plan(foreign, owned, owned.lastModel, owned.lastDuration, config);
+		Check(!decision.write && !decision.conflict, "external combat record was modified");
+	}
+	write(legacy);
+	const auto filtered = Manifest::ReadRoutes(path);
+	Check(filtered.size() == 1 && filtered[0].plugin == "Skyrim.esm" && filtered[0].models == route.models,
+		"legacy combat redirects disabled native routes or survived filtering");
+	write("schemaVersion=1\n[[Route]]\nplugin='ValhallaCombat.esp'\n");
+	Check(Manifest::ReadRoutes(path).empty(), "legacy external-only manifest still took ownership of combat effects");
+	auto mixedCase = Fixture(); mixedCase.plugin = "SKYRIM.ESM";
+	Check(ValidRoute(mixedCase), "vanilla plugin comparison became case sensitive");
 }
 
 void NativeLayersCoverUnarmoredHitsAndPowerAttacks()
@@ -270,10 +252,31 @@ void FormFreeNativePlaybackPolicies()
 	RedsandSettings::Config config;
 	NativeRoute block{ NativeLayer::Block, "StellarImpact/Runtime/B2D2S2/Block/NormalBlock.nif", .85f };
 	Check(ValidNativeRoute(block), "valid form-free block route rejected");
-	Check(NativeBlockIntegrationModel(&block, true, config) == block.model.c_str(), "native block route depends on a plugin form");
-	Check(NormalizePath(NativeBlockBridgeModel(&block, true, true, config)) == "stellarimpact\\runtime\\off.nif", "ready native block did not suppress duplicate Maxsu bridge");
-	Check(NativeBlockBridgeModel(&block, true, false, config) == block.model.c_str(), "unready native callbacks lost block bridge fallback");
-	Check(!NativeBlockBridgeModel(&block, false, true, config), "uninitialized bridge exposed a model");
+	const auto models = BlockStyleModelPaths(block);
+	const BlockStyleModels expected{
+		"StellarImpact/Runtime/B2D2S2/Block/NormalBlock.nif", "StellarImpact/Runtime/B2D2S2/Block/TimedSparks.nif",
+		"StellarImpact/Runtime/B2D2S2/Block/TimedFlare.nif", "StellarImpact/Runtime/B2D2S2/Block/PerfectRing.nif",
+		"StellarImpact/Runtime/B2D2S2/Block/SimpleTimed.nif", "StellarImpact/Block/StarRing.nif"
+	};
+	Check(models == expected, "block style choices lost their installed native models");
+	BlockStyleAvailability available{ true, true, true, true, true, true };
+	for (unsigned index = 0; index < models.size(); ++index) {
+		const auto style = static_cast<RedsandSettings::BlockStyle>(index);
+		Check(BlockStyleIndex(style, available) == index, "available native block style was unreachable");
+		Check(BlockStyleDuration(block.duration, BlockStyleIndex(style, available)) ==
+			(style == RedsandSettings::BlockStyle::StarRing ? 2.f : block.duration), "block style lifespan clipped the ring or changed existing sparks");
+		available[index] = false;
+		Check(BlockStyleIndex(style, available) == 0, "missing block style did not fall back to normal sparks");
+		Check(BlockStyleDuration(block.duration, BlockStyleIndex(style, available)) == block.duration,
+			"missing ring fallback retained the longer ring lifespan");
+		available[index] = true;
+	}
+	Check(BlockStyleIndex(RedsandSettings::BlockStyle::Count, available) == 0 &&
+		BlockStyleIndex(static_cast<RedsandSettings::BlockStyle>(-1), available) == 0, "invalid block style escaped default fallback");
+	Check(BlockStyleDuration(3.f, static_cast<unsigned>(RedsandSettings::BlockStyle::StarRing)) == 3.f,
+		"ring lifespan shortened an explicitly longer native duration");
+	auto unrelated = block; unrelated.layer = NativeLayer::Hit;
+	Check(BlockStyleModelPaths(unrelated) == BlockStyleModels{}, "block style model selection leaked into hit effects");
 	Check(SelectNativeBlock(true, true, false, config) && !SelectNativeBlock(true, true, true, config) &&
 		!SelectNativeBlock(true, false, false, config), "ordinary blocks and bashes were conflated");
 	Check(SelectNativeWorld(false, true, false, config) && !SelectNativeWorld(true, true, false, config) &&
@@ -288,11 +291,11 @@ void FormFreeNativePlaybackPolicies()
 	Check(!SelectNativeProjectileLayer(true,false,true,config) && SelectNativeProjectileLayer(true,true,true,config) == NativeLayer::Block,
 		"hit toggle disabled independent arrow blocks");
 	config.impactBlock = false;
-	Check(!NativeBlockBridgeModel(&block,true,true,config) && !SelectNativeBlock(true,true,false,config) &&
+	Check(!SelectNativeBlock(true,true,false,config) &&
 		!SelectNativeProjectileLayer(true,true,true,config), "block off failed to restore original routes");
 	config.impactHit = true; config.impactBlock = true; config.impactEnabled = false;
 	Check(!SelectNativeProjectileLayer(true,false,true,config) && !SelectNativeWorld(false,true,false,config) &&
-		!NativeBlockBridgeModel(&block,true,true,config), "master off leaked form-free native visuals");
+		!SelectNativeBlock(true,true,false,config), "master off leaked form-free native visuals");
 	block.duration = std::numeric_limits<float>::quiet_NaN(); Check(!ValidNativeRoute(block), "native NaN lifetime accepted");
 	block.duration = .85f; block.model = "../outside.nif"; Check(!ValidNativeRoute(block), "unsafe native model accepted");
 }
@@ -338,8 +341,6 @@ int main(int argc, char** argv)
 		NativeLayersCoverUnarmoredHitsAndPowerAttacks();
 		FormFreeNativePlaybackPolicies();
 		NativeManifestRejectsFormDependenciesAndMalformedLayers();
-		InstalledValhallaRingCanBeRestoredIndependently();
-		BlockIntegrationNeverCachesOrLeaksDisabledModels();
 		ThirdPartyOwnershipProtection(); ExplosionNeverOwnsData(); ProjectileSuppressionAndRestoration(); InvalidRoutesFailClosed();
 		ManifestParserRejectsBadAndDuplicateRoutes();
 		if (argc == 2) {

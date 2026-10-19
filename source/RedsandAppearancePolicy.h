@@ -10,6 +10,16 @@ namespace RedsandAppearance
 	inline constexpr std::string_view lengthTag = "RSRGBCutLength_v1";
 	inline constexpr float rateTagTime1 = 1.f / 32768.f;
 	inline constexpr float rateTagTime2 = 1.f / 16384.f;
+	inline float GlowStrength(float original, bool originalBaseline, const RedsandSettings::Config& config)
+	{
+		return original * (originalBaseline ? 1.f : RedsandSettings::impactBrightnessBaseline) * config.impactBrightness;
+	}
+	template <class Sequence, class Activate>
+	inline void StartBlockSequenceOnce(float& marker, Sequence* sequence, Activate&& activate)
+	{
+		if (marker != 0.f || !sequence) { return; }
+		if (!sequence->Inactive() || activate(sequence)) { marker = 1.f; }
+	}
 	inline float SlashSpeed(float original, const RedsandSettings::Config& config) { return original * RedsandSettings::slashDistanceBaseline * config.slashDistance; }
 	inline float SlashSpread(float original, const RedsandSettings::Config& config) { return original * RedsandSettings::slashSpreadBaseline * config.slashSpread; }
 	inline float SlashDensity(const RedsandSettings::Config& config) { return std::min(config.impactDensity * config.slashDensity * RedsandSettings::slashDensityBaseline, RedsandSettings::maxDensity) * RedsandSettings::impactDensityBaseline; }

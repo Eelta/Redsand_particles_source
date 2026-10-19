@@ -63,7 +63,7 @@ def main():
     base_routes = tomllib.loads(runtime[route_name].decode('utf-8-sig'))['Route']
     with zipfile.ZipFile(args.archive) as z:
         assert len(z.namelist()) == len(set(z.namelist()))
-        assert all(name.startswith(('Core/', 'Compatibility/', 'Options/')) or
+        assert all(name.startswith(('Core/', 'Options/')) or
                    name in {'fomod/ModuleConfig.xml', 'fomod/info.xml'} for name in z.namelist())
         root = ET.fromstring(z.read('fomod/ModuleConfig.xml'))
         assert root.tag == 'config'
@@ -85,8 +85,8 @@ def main():
 
 
         for name in z.namelist():
-            if name.startswith(('Core/', 'Compatibility/')):
-                relative = name.split('/', 1)[1] if name.startswith('Core/') else name.split('/', 2)[2]
+            if name.startswith('Core/'):
+                relative = name.split('/', 1)[1]
                 assert is_runtime_file(relative), relative
                 assert z.read(name) == runtime[relative], relative
         count = 0
@@ -113,15 +113,11 @@ def main():
                     original = configparser.ConfigParser()
                     original.read_string(runtime[ini_name].decode('utf-8-sig'))
                     assert dict(cfg[section]) == dict(original[section]), 'Installer changed RGB defaults'
-            assert ('SKSE/Plugins/MaxsuBlockSpark.dll' in payload) == (flags['block'] == 'on')
-            assert ('Meshes/ValhallaCombat/SparksFlareRings.nif' in payload) == (flags['block'] == 'on')
-            for name in runtime:
-                if name.startswith('SKSE/Plugins/MuImpactFramework/'):
-                    key = 'block' if PurePosixPath(name).name.startswith('blocking_') else 'hit'
-                    assert (name in payload) == (flags[key] == 'on')
+            assert {name for name in payload if name.endswith('.dll')} == {'SKSE/Plugins/Precision.dll'}
             content = z.read(payload[route_name])
             routes = tomllib.loads(content.decode('utf-8-sig'))
             assert len(routes['Native']) == 5
+            assert all(route['plugin'] == 'Skyrim.esm' for route in routes['Route'])
             expected = [r for r in base_routes if flags[r['category'].lower()] == 'on']
             assert routes['Route'] == expected
             if args.decoder and payload[route_name] not in decoded:

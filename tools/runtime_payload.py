@@ -6,10 +6,10 @@ def is_runtime_file(name):
     if path.is_absolute() or '..' in path.parts or ':' in name or '\\' in name:
         raise ValueError(f'Invalid package path: {name}')
     suffix = path.suffix.lower()
-    return ((name.startswith('Meshes/') and suffix == '.nif') or
-            (name.startswith('Textures/') and suffix == '.dds') or
-            (name.startswith('SKSE/Plugins/') and suffix in {'.dll', '.ini', '.toml'}) or
-            (name.startswith('SKSE/CoreImpactFramework/') and suffix == '.json'))
+    return (any(name.startswith(f'Meshes/{folder}/') for folder in ('RedsandParticles', 'RedsandBlockLightning', 'StellarImpact')) and suffix == '.nif' or
+            any(name.startswith(f'Textures/{folder}/') for folder in ('RedsandParticles', 'RedsandBlockLightning', 'StellarImpact')) and suffix == '.dds' or
+            name in {'SKSE/Plugins/Precision.dll', 'SKSE/Plugins/RedsandParticles.ini',
+                     'SKSE/Plugins/RedsandImpactVFX.toml', 'SKSE/Plugins/Precision/Precision_ElementalDesert.toml'})
 
 
 def runtime_payload(payload):

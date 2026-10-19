@@ -278,7 +278,7 @@ namespace
 	{
 		const auto path = workspace.path / "impact.ini";
 		Write(path, "[Menu]\nLanguage=Chinese\n[SwordParticles]\nKeepPrecisionTrail=true\nBrightness=2.5\n"
-			"[BowParticles]\nDensity=0.75\n[ImpactVFX]\nEnabled=false\nHit=false\nSlash=false\nBlock=true\nBrightnessLevel=3\nDensityLevel=0\nSizeLevel=1\n");
+			"[BowParticles]\nDensity=0.75\n[ImpactVFX]\nEnabled=false\nHit=false\nSlash=false\nBlock=true\nPreserveValhallaRing=true\nBrightnessLevel=3\nDensityLevel=0\nSizeLevel=1\n");
 		RedsandSettings::Load(path);
 		auto config = RedsandSettings::Get();
 		Check(!config.impactEnabled && !config.impactHit && !config.impactSlash && config.impactBlock &&
@@ -286,11 +286,10 @@ namespace
 			"impact settings failed to load");
 		Check(config.swordKeepPrecisionTrail && config.swordBrightness == 2.5f && config.bowDensity == 0.75f &&
 			config.language == RedsandSettings::Language::Chinese, "impact migration changed prior settings");
-		Check(config.preserveValhallaRing,"approved preserved ring should be the default");
-		config.preserveValhallaRing=true;
 		config.impactEnabled = true; config.impactBrightness = 1.37f; config.impactDensity = 2.85f; config.impactSize = .73f;
 		RedsandSettings::Set(config); RedsandSettings::FlushPendingSave(); RedsandSettings::Load(path);
 		Check(RedsandSettings::Get() == config, "impact settings did not persist independently");
+		Check(Read(path).find("PreserveValhallaRing") == std::string::npos, "removed combat integration setting was still saved");
 		Write(path, "[ImpactVFX]\nBrightnessLevel=nan\nDensityLevel=1.5\nSizeLevel=junk\n");
 		RedsandSettings::Load(path);
 		Check(RedsandSettings::Get().impactBrightness == 1 && RedsandSettings::Get().impactDensity == 1 &&
@@ -417,10 +416,41 @@ void RandomSlashPersistsAndDefaultsOff(const Workspace& workspace)
     Check(Get().slashRandomRange == .5f, "invalid numeric range did not restore 50%");
 }
 
+void BlockStylesPersistAndDefaultToNormal(const Workspace& workspace)
+{
+	using namespace RedsandSettings;
+	const auto path = workspace.path / "block-style.ini";
+	Write(path, "[ImpactVFX]\nBrightness=1.75\nDensity=0.6\n");
+	Load(path);
+	Check(Get().blockStyle == BlockStyle::NormalBlock, "existing settings did not retain normal block visuals");
+	for (unsigned index = 0; index < static_cast<unsigned>(BlockStyle::Count); ++index) {
+		Write(path, "[ImpactVFX]\nBrightness=1.75\nDensity=0.6\nBlockStyle=" + std::to_string(index) + "\n");
+		Load(path);
+		auto config = Get();
+		Check(static_cast<unsigned>(config.blockStyle) == index && config.impactBrightness == 1.75f && config.impactDensity == .6f,
+			"block style changed glow or particle settings");
+		config.diagnostics = true;
+		Set(config); FlushPendingSave(); Load(path);
+		Check(Get() == config && Read(path).find("BlockStyle=" + std::to_string(index)) != std::string::npos,
+			"block style did not round trip through INI storage");
+	}
+	for (const auto* value : { "", "-1", "6", "1.5", "junk", "4294967296" }) {
+		Write(path, "[ImpactVFX]\nBlockStyle=" + std::string(value) + "\nBrightness=1.75\n");
+		Load(path);
+		Check(Get().blockStyle == BlockStyle::NormalBlock && Get().impactBrightness == 1.75f,
+			"invalid block style was accepted or damaged unrelated settings");
+	}
+	auto invalid = Get(); invalid.blockStyle = static_cast<BlockStyle>(-1); Set(invalid);
+	Check(Get().blockStyle == BlockStyle::NormalBlock, "invalid runtime block style escaped normalization");
+	auto selected = Get(); selected.blockStyle = BlockStyle::PerfectRing; Set(selected); ResetDefaults();
+	Check(Get().blockStyle == BlockStyle::NormalBlock, "defaults retained an alternate block style");
+}
+
 int main()
 {
 	try {
 		const Workspace workspace;
+		BlockStylesPersistAndDefaultToNormal(workspace);
         RandomSlashPersistsAndDefaultsOff(workspace);
 		ExistingBowIniRemainsCompatible(workspace);
 		SwordDefaultsAndSavedOverridesRemainDistinct(workspace);

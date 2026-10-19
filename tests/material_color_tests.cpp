@@ -1,5 +1,6 @@
 #include "../source/RedsandMaterialColor.h"
 #include "../source/RedsandSlashRandom.h"
+#include "../source/RedsandAppearancePolicy.h"
 #include <iostream>
 #include <stdexcept>
 
@@ -67,6 +68,24 @@ int main()
         }
         Check(contact.commits == 1 && contact.value.baseColor.alpha == .37f && contact.value.texture == 19 &&
             contact.value.baseColorScale == 8.f, "late correction changed fade/texture/glow or allocated every frame");
+		for (unsigned reload = 0; reload < 2; ++reload) {
+			Shader star;
+			auto* starMaterial = star.GetMaterial();
+			const auto originalGlow = starMaterial->baseColorScale;
+			RedsandSettings::Config starConfig;
+			for (unsigned frame = 0; frame < 1000; ++frame) {
+				Check(Commit(&star, starMaterial, { 0.f, 0.f, 0.f }, RedsandAppearance::GlowStrength(originalGlow, true, starConfig), false, release),
+					"black ring RGB failed to publish");
+			}
+			Check(starMaterial->baseColor.red == 0.f && starMaterial->baseColor.green == 0.f && starMaterial->baseColor.blue == 0.f &&
+				starMaterial->baseColorScale == originalGlow && star.commits == 1, "black or repeated ring updates accumulated glow");
+			starConfig.impactBrightness = 1.5f;
+			Check(Commit(&star, starMaterial, { .2f, .8f, .4f }, RedsandAppearance::GlowStrength(originalGlow, true, starConfig), false, release) &&
+				starMaterial->baseColorScale == 12.f, "ring brightness did not use its original baseline after black RGB");
+			starConfig.impactBrightness = 1.f;
+			Check(Commit(&star, starMaterial, { .2f, .8f, .4f }, RedsandAppearance::GlowStrength(originalGlow, true, starConfig), false, release) &&
+				starMaterial->baseColorScale == originalGlow, "ring brightness failed to return to its original baseline");
+		}
 		std::cout << "Render-pass color capture, private material isolation, animated alpha preservation, allocation failure and steady-state reuse passed\n";
 	} catch (const std::exception& e) { std::cerr << e.what() << '\n'; return 1; }
 }

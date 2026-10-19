@@ -41,7 +41,8 @@ namespace RedsandImpactVFX
 		RedsandSettings::Config lastConfig;
 		bool diagnosticsWereEnabled = false;
 		std::array<std::optional<NativeRoute>, static_cast<unsigned>(NativeLayer::Count)> nativeRoutes;
-		bool suppressBlockAdapter = false;
+		BlockStyleModels blockStyleModels;
+		BlockStyleAvailability blockStylesAvailable{};
 		std::size_t expectedVanillaRoutes = 0;
 		struct RandomSlashRequest
 		{
@@ -102,9 +103,6 @@ namespace RedsandImpactVFX
 			std::lock_guard lock(statusLock);
 			++status.conflicts;
 			--status.resolved;
-			if (live.definition.form == 0x60C32 && NormalizePath(live.definition.plugin) == "valhallacombat.esp") {
-				status.valhallaRingControlled = false;
-			}
 			status.detail = Identity(live.definition) + ": changed by another module: " + currentModel;
 			logger::warn("Redsand Impact VFX relinquished {}", status.detail);
 			RedsandLog::warn("Impact VFX relinquished {}", status.detail);
@@ -222,6 +220,10 @@ namespace RedsandImpactVFX
 		{
 			const auto* route = NativeRouteFor(selected);
 			if (!route || !cell || !Enabled(NativeCategory(selected), config)) { return nullptr; }
+			const auto blockStyle = selected == NativeLayer::Block ? BlockStyleIndex(config.blockStyle, blockStylesAvailable) : 0;
+			const auto& model = selected == NativeLayer::Block ?
+				blockStyleModels[blockStyle] : route->model;
+			const auto duration = selected == NativeLayer::Block ? BlockStyleDuration(route->duration, blockStyle) : route->duration;
 			const auto probeKind = static_cast<unsigned>(selected);
 			const auto* layer = nativeLayerNames[probeKind].data();
 
@@ -231,8 +233,8 @@ namespace RedsandImpactVFX
 				(RedsandSlashRandom::attackSeed ? RedsandSlashRandom::attackSeed : RedsandSlashRandom::NextSeed()) : 0u;
 			const auto sceneSeed = slashContact && selected == NativeLayer::Hit ? -static_cast<std::int32_t>(seed) : static_cast<std::int32_t>(seed);
 			RedsandSlashRandom::AttackScope randomScope(seed ? seed : RedsandSlashRandom::attackSeed);
-			auto* effect = RE::BSTempEffectParticle::Spawn(cell, route->duration,
-				route->model.c_str(), basis, position, 1.f, 7, nullptr);
+			auto* effect = RE::BSTempEffectParticle::Spawn(cell, duration,
+				model.c_str(), basis, position, 1.f, 7, nullptr);
 			if (effect && seed && !AttachSlashSeed(effect->particleObject.get(), sceneSeed)) {
 				std::lock_guard lock(randomSlashLock);
 				randomSlashRequests.push_back({ RE::NiPointer<RE::BSTempEffectParticle>(effect), sceneSeed, std::chrono::steady_clock::now() });
@@ -240,7 +242,7 @@ namespace RedsandImpactVFX
 			}
 			if (config.diagnostics && probeCounts[probeKind] < 2) {
 				++probeCounts[probeKind];
-				logger::info("Redsand native {} request: factoryResult={} model={}", layer, effect != nullptr, route->model);
+				logger::info("Redsand native {} request: factoryResult={} model={}", layer, effect != nullptr, model);
 				if (effect) { playbackProbes.push_back({RE::NiPointer<RE::BSTempEffectParticle>(effect), layer, std::chrono::steady_clock::now()}); }
 			}
 			return effect;
@@ -398,16 +400,6 @@ namespace RedsandImpactVFX
 		return status;
 	}
 
-	const char* GetBlockImpactModel() noexcept
-	{
-		try {
-			if (!ready.load(std::memory_order_acquire)) { return nullptr; }
-
-
-			return NativeBlockBridgeModel(NativeRouteFor(NativeLayer::Block), true, suppressBlockAdapter, RedsandSettings::Get());
-		} catch (...) { return nullptr; }
-	}
-
 	void Initialize()
 	{
 
@@ -436,12 +428,25 @@ namespace RedsandImpactVFX
 					nativeRoutes[static_cast<unsigned>(definition.layer)] = definition;
 					++next.resolved; ++next.nativeResolved;
 				}
+				if (const auto* block = NativeRouteFor(NativeLayer::Block)) {
+					blockStyleModels = BlockStyleModelPaths(*block);
+					for (std::size_t index = 0; index < blockStyleModels.size(); ++index) {
+						blockStylesAvailable[index] = AvailableModel(blockStyleModels[index]);
+						if (!blockStylesAvailable[index]) {
+							++next.resourceFailures;
+							next.detail = "Block style missing asset: Meshes\\" + blockStyleModels[index];
+							logger::warn("Redsand Impact VFX block style skipped: {}", next.detail);
+						}
+					}
+					next.blockAvailable = blockStylesAvailable[0];
+				}
 				auto* handler = RE::TESDataHandler::GetSingleton();
 				Manifest::Require(handler != nullptr, "TESDataHandler unavailable");
 				ModelAvailability checkedModels;
 				for (const auto& definition : definitions) {
+					if (NormalizePath(definition.plugin) != "skyrim.esm") { continue; }
 					auto* form = handler->LookupForm(definition.form, definition.plugin);
-					if (!form) { ++next.missing; next.detail = "Missing optional form: " + Identity(definition); continue; }
+					if (!form) { ++next.missing; next.detail = "Missing game form: " + Identity(definition); continue; }
 					LiveRoute live;
 					live.definition = definition;
 					if (definition.kind == Kind::Impact) {
@@ -476,9 +481,6 @@ namespace RedsandImpactVFX
 					live.ownership.lastDuration = live.impact ? live.impact->data.effectDuration : 0.0f;
 					routes.push_back(std::move(live));
 					++next.resolved;
-					if (definition.form == 0x60C32 && NormalizePath(definition.plugin) == "valhallacombat.esp") {
-						next.valhallaRingControlled = true;
-					}
 				}
 				if (NativeRouteFor(NativeLayer::Slash) || NativeRouteFor(NativeLayer::Hit) ||
 					NativeRouteFor(NativeLayer::Wave) || NativeRouteFor(NativeLayer::Block)) {
@@ -495,7 +497,6 @@ namespace RedsandImpactVFX
 						next.arrowCallback = true;
 					}
 				}
-				suppressBlockAdapter = next.slashCallback && next.arrowCallback && NativeRouteFor(NativeLayer::Block) && AvailableModel("StellarImpact\\Runtime\\Off.nif");
 				next.availability = routes.empty() && !next.nativeResolved ? Availability::InvalidRoutes : Availability::Ready;
 				applyPending = true;
 			}
@@ -504,7 +505,9 @@ namespace RedsandImpactVFX
 
 			routes.clear();
 			for (auto& route : nativeRoutes) { route.reset(); }
-			suppressBlockAdapter = false;
+			blockStyleModels = {};
+			blockStylesAvailable = {};
+			next.blockAvailable = false;
 			next.resolved = 0;
 			next.nativeResolved = 0;
 			next.availability = Availability::InvalidRoutes;
@@ -516,12 +519,12 @@ namespace RedsandImpactVFX
 			status = next;
 		}
 		const auto config = RedsandSettings::Get();
-		logger::info("Redsand Impact VFX initialized: controls=2 state={} routes={}/{} missingForms={} wrongTypes={} missingAssets={} unknownModels={} nativeSlash={} blockAPI={} requestedPreset={} enabled={}/{}/{}/{} detail={}",
+		logger::info("Redsand Impact VFX initialized: controls=2 state={} routes={}/{} missingForms={} wrongTypes={} missingAssets={} unknownModels={} nativeSlash={} nativeBlock={} requestedPreset={} enabled={}/{}/{}/{} detail={}",
 			static_cast<int>(next.availability), next.resolved, next.definitions, next.missing, next.wrongTypes,
 			next.resourceFailures, next.unknownModels, next.slashCallback, NativeRouteFor(NativeLayer::Block) != nullptr, ModelIndex(config), config.impactEnabled,
 			config.impactHit, config.impactSlash, config.impactBlock, next.detail);
-		logger::info("Redsand Impact VFX native layers={} mainThreadWorld={} arrowEvents={} suppressDuplicateBlockAdapter={}",
-			next.nativeResolved, next.worldCallback, next.arrowCallback, suppressBlockAdapter);
+		logger::info("Redsand Impact VFX native layers={} mainThreadWorld={} arrowEvents={}",
+			next.nativeResolved, next.worldCallback, next.arrowCallback);
 
 
 		ready.store(true, std::memory_order_release);
@@ -554,7 +557,6 @@ namespace RedsandImpactVFX
 		diagnosticsWereEnabled = config.diagnostics;
 		if (!applyPending && config.impactEnabled == lastConfig.impactEnabled && config.impactHit == lastConfig.impactHit &&
 			config.impactSlash == lastConfig.impactSlash && config.impactBlock == lastConfig.impactBlock &&
-			config.preserveValhallaRing == lastConfig.preserveValhallaRing &&
 			ModelIndex(config) == ModelIndex(lastConfig)) { return; }
 		applyPending = false;
 		lastConfig = config;
@@ -602,9 +604,4 @@ namespace RedsandImpactVFX
 		RedsandLog::info("Impact VFX applied: enabled={} hit={} slash={} block={} preset={} modelsChanged={}",
 			config.impactEnabled, config.impactHit, config.impactSlash, config.impactBlock, ModelIndex(config), changed);
 	}
-}
-
-extern "C" __declspec(dllexport) const char* __cdecl Redsand_GetBlockImpactModel_v1() noexcept
-{
-	return RedsandImpactVFX::GetBlockImpactModel();
 }

@@ -9,6 +9,8 @@
 #include <RE/N/NiFloatInterpolator.h>
 #include <RE/N/NiFloatData.h>
 #include <RE/N/NiInterpController.h>
+#include <RE/N/NiControllerManager.h>
+#include <RE/N/NiControllerSequence.h>
 #include <array>
 #include <algorithm>
 #include <cstring>
@@ -54,6 +56,18 @@ namespace RedsandAppearance
 		{
 			const auto* name = root ? root->name.c_str() : nullptr;
 			return name && std::strcmp(name, rootTag.data()) == 0;
+		}
+
+		void StartBlockSequence(RE::NiNode* root)
+		{
+			static const RE::BSFixedString name{ "RSBlockSequence_v1" };
+			auto* marker = netimmerse_cast<RE::NiFloatExtraData*>(root->GetExtraData(name));
+			if (!marker || marker->value != 0.f) { return; }
+			auto* manager = root->GetController<RE::NiControllerManager>();
+			if (!manager) { return; }
+			StartBlockSequenceOnce(marker->value, manager->GetSequenceByName("SpecialIdle_AreaEffect"), [](RE::NiControllerSequence* sequence) {
+				return sequence->Activate(0, true, 1.f, 0.f, nullptr, false);
+			});
 		}
 
 #include "SlashEmitterControls.inc"
@@ -141,14 +155,14 @@ namespace RedsandAppearance
 			const auto& rgb = Color(config, *group);
 			const float peak = std::abs(marker->value);
 			std::optional<float> wantedGlow;
-			static const RE::BSFixedString glowName{ "RSGlow_v2" }, animatedName{ "RSAnimatedGlow_v2" };
+			static const RE::BSFixedString glowName{ "RSGlow_v2" }, animatedName{ "RSAnimatedGlow_v2" }, originalGlowName{ "RSOriginalGlow_v1" };
 			if (!shader->GetExtraData(animatedName)) {
 				auto* glow = netimmerse_cast<RE::NiFloatExtraData*>(geometry->GetExtraData(glowName));
 				if (!glow) {
 					RE::NiPointer<RE::NiFloatExtraData> extra{ RE::NiFloatExtraData::Create(glowName, material->baseColorScale) };
 					if (extra && geometry->AddExtraData(extra.get())) { glow = extra.get(); }
 				}
-				if (glow) { wantedGlow = glow->value * RedsandSettings::impactBrightnessBaseline * config.impactBrightness; }
+				if (glow) { wantedGlow = GlowStrength(glow->value, shader->GetExtraData(originalGlowName) != nullptr, config); }
 			}
 			if (!RedsandMaterialColor::Commit(shader, material, { rgb[0] * peak, rgb[1] * peak, rgb[2] * peak },
 				wantedGlow, marker->value < 0.f, [](auto* copy) { copy->~BSEffectShaderMaterial(); RE::free(copy); })) { return; }
@@ -224,6 +238,7 @@ namespace RedsandAppearance
 			if (!Owned(root)) { original(root, data, arg); return; }
             UpdateScope scope(root);
             if (scope.Nested()) { original(root, data, arg); return; }
+			StartBlockSequence(root);
 			const auto config = ForRoot(root);
 			RedsandSlashRandom::AppearanceScope appearance(config);
 

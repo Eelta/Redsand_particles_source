@@ -6,6 +6,7 @@
 namespace RedsandSettings
 {
 	enum class Language { English = 0, Chinese = 1 };
+	enum class BlockStyle : unsigned { NormalBlock, TimedSparks, TimedFlare, PerfectRing, SimpleTimed, StarRing, Count };
 
 	inline constexpr float maxBrightness = 20.0f;
 	inline constexpr float maxDensity = 10.0f;
@@ -73,6 +74,7 @@ namespace RedsandSettings
 		bool slashRandomValues = false;
 		float slashRandomRange = .5f;
 		bool impactBlock = true;
+		BlockStyle blockStyle = BlockStyle::NormalBlock;
         bool blockLightning = false;
         bool blockLightningRandomTrigger = true;
         bool blockLightningRandomColor = false;
@@ -80,7 +82,6 @@ namespace RedsandSettings
         float blockLightningBrightness = 1.f;
         float blockLightningSize = 1.f;
         std::array<float, 3> blockLightningColor = defaultLightningColor;
-		bool preserveValhallaRing = true;
 		float impactBrightness = 1.f;
 		float impactDensity = 1.f;
 		float impactSize = 1.f;

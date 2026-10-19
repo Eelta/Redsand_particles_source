@@ -331,21 +331,13 @@ try {
         [IO.Directory]::CreateDirectory((Split-Path -Parent $target)) | Out-Null
         Copy-Item -LiteralPath $asset.FullName -Destination $target -Force
     }
-    $maxsuBuild = Join-Path $WorkRoot 'maxsu-build'
-    Run 'cmake' @('-S', (Join-Path $PSScriptRoot 'compat/maxsu'), '-B', $maxsuBuild, '-G', 'Visual Studio 17 2022', '-A', 'x64', "-DREDSAND_BUILD=$WorkRoot")
-    Run 'cmake' @('--build', $maxsuBuild, '--config', 'Release', '--parallel', "$($config.jobs)")
-    Run 'ctest' @('--test-dir', $maxsuBuild, '-C', 'Release', '--output-on-failure')
-    $maxsuAsset = Join-Path $PSScriptRoot 'assets/ImpactVFX/SKSE/Plugins/MaxsuBlockSpark.dll'
-    [IO.Directory]::CreateDirectory((Split-Path -Parent $maxsuAsset)) | Out-Null
-    Copy-Item -LiteralPath (Join-Path $maxsuBuild 'Release/MaxsuBlockSpark.dll') -Destination $maxsuAsset -Force
     $impactAssets = Join-Path $PSScriptRoot 'assets/ImpactVFX'
     $impactAssetHashes = [ordered]@{}
-    $impactMifFiles = @(Get-Content -LiteralPath (Join-Path $PSScriptRoot 'tools/impact_mif_allowlist.json') -Raw | ConvertFrom-Json)
-    $impactCompatFiles = @(Get-Content -LiteralPath (Join-Path $PSScriptRoot 'tools/impact_compat_allowlist.json') -Raw | ConvertFrom-Json)
     if (Test-Path -LiteralPath $impactAssets -PathType Container) {
         foreach ($asset in Get-ChildItem -LiteralPath $impactAssets -Recurse -File) {
             $relative = $asset.FullName.Substring($impactAssets.Length + 1)
-            if ($relative -notmatch '^(SKSE[\\/]CoreImpactFramework[\\/]StellarImpact\.json|SKSE[\\/]Plugins[\\/]RedsandImpactVFX\.toml|Meshes[\\/]StellarImpact[\\/].+\.nif|Textures[\\/]StellarImpact[\\/].+\.dds|Docs[\\/]StellarImpact[\\/](README-zh-CN|CREDITS)\.md)$' -and $relative.Replace('\', '/') -notin $impactMifFiles -and $relative.Replace('\', '/') -notin $impactCompatFiles) {
+            if ($relative -match '^Docs[\\/]') { continue }
+            if ($relative -notmatch '^(SKSE[\\/]Plugins[\\/]RedsandImpactVFX\.toml|Meshes[\\/]StellarImpact[\\/].+\.nif|Textures[\\/]StellarImpact[\\/].+\.dds)$') {
                 throw "Unexpected ImpactVFX module file: $relative"
             }
             $target = [IO.Path]::GetFullPath((Join-Path $stage $relative))
@@ -395,7 +387,6 @@ try {
         skseMenuFrameworkAPI=2
         swordTipAttachment=2
         swordTipWorldSpaceParticlesDoNotDrift=$false
-        preserveInstalledValhallaPerfectRingDefault=$true
         optionalPrecisionRibbonAlongsideParticles=$true
         keepPrecisionTrailDefault=$true
         impactVFXControls=3
@@ -416,7 +407,10 @@ try {
         impactVFXIncludesSounds=$false
         impactVFXPresetCount=64
         impactVFXNativeMeasuredSlash=1
-        impactVFXModelRouteTypes=@('IPCT', 'EXPL', 'PROJ')
+        impactVFXModelRouteTypes=@('IPCT')
+        impactVFXRoutePlugins=@('Skyrim.esm')
+        bundledCombatPlugins=$false
+        overwritesOtherCombatMods=$false
         impactVFXDefaultLevels=@(2, 2, 2)
         impactVFXBrightnessLevels=@(0.10, 0.50, 1.0, 12.0)
         impactVFXDensityLevels=@(0.10, 0.50, 1.0, 6.0)
