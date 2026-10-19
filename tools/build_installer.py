@@ -7,6 +7,7 @@ import json
 import re
 import xml.etree.ElementTree as ET
 import zipfile
+from runtime_payload import runtime_payload
 
 
 AXES = {name: ('on', 'off') for name in ('hit', 'slash', 'block')}
@@ -123,6 +124,7 @@ def main():
     with zipfile.ZipFile(args.runtime) as source:
         runtime = {name: source.read(name) for name in source.namelist()}
     assert sha(args.runtime.read_bytes()) == manifest['packageSHA256']
+    runtime = runtime_payload(runtime)
     assert not any(Path(name).suffix.lower() in {'.esp', '.esm', '.esl'} for name in runtime)
     with zipfile.ZipFile(args.output, 'w', zipfile.ZIP_DEFLATED, compresslevel=9) as z:
         for name, data in runtime.items():

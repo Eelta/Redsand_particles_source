@@ -53,7 +53,12 @@ def main():
     stage = args.work / "Data"
     if stage.exists():
         raise RuntimeError("Use a new package work directory")
-    docs = stage / "Docs/HellbladePlayerTime"
+    docs = args.work / "Source/HellbladePlayerTime"
+    internal = root.parent / "output/BuildData"
+    source_output = internal / "Sources"
+    symbols = internal / "Symbols"
+    source_output.mkdir(parents=True, exist_ok=True)
+    symbols.mkdir(parents=True, exist_ok=True)
     plugins = stage / "SKSE/Plugins"
     docs.mkdir(parents=True)
     plugins.mkdir(parents=True)
@@ -91,9 +96,9 @@ Lightning geometry and shader code were created for this patch; no Stellar Blade
 Keep this Hellblade derivative free and Donation Points disabled under the upstream distribution terms.
 CommonLibSSE-NG: https://github.com/alandtse/CommonLibSSE-NG
 Fixed revision: 8b032fa992750d654d6d38a33731714d8b86be1f
-GPL-3.0 and the retained Modding / Linking exceptions are included. Matching derivative and dependency source is bundled in SOURCE.zip. Other dependencies retain their bundled licenses.
+GPL-3.0 and the retained Modding / Linking exceptions are included. Matching derivative and dependency source is retained in the separate source archive. Other dependencies retain their bundled licenses.
 
-Source archive BUILDING.txt describes the exact prepared dependency layout used. Matching PDB and native build records remain alongside the local output ZIP; they are not needed by players.
+Source archive BUILDING.txt describes the exact prepared dependency layout used. Matching PDB and native build records remain in output/BuildData; they are not needed by players.
 This package is local only; no GitHub Release, tag or upload was created.
 """
     docs.joinpath("INSTALL.zh-CN.txt").write_text(install, encoding="utf-8-sig")
@@ -109,7 +114,7 @@ This package is local only; no GitHub Release, tag or upload was created.
     deps = ("directxmath", "directxtk", "fmt", "rapidcsv", "rsm-binary-io", "simpleini", "spdlog", "tomlplusplus", "xbyak")
     installed_share = args.prepared / "Precision/build-release/vcpkg_installed/x64-windows-static-md/share"
     source_dependencies = {}
-    source_zip = docs / "SOURCE.zip"
+    source_zip = source_output / "Hellblade - Corresponding Source.zip"
     with zipfile.ZipFile(source_zip, "w", zipfile.ZIP_DEFLATED, compresslevel=9) as archive:
         for name in ("source", "tests", "assets"):
             add_tree(archive, root / name, "HellbladePlayerTime/" + name)
@@ -139,6 +144,13 @@ REDSAND_BUILD names the reuse of a local developer dependency workspace only. Th
 Official baseline and upstream project identity are recorded in baseline.json and upstream-project.json. Original Hellblade game data is not included: install the original full mod separately.
 """
         archive.writestr("BUILDING.txt", build_text)
+        for path in sorted(docs.rglob("*")):
+            if path.is_file():
+                archive.write(path, "Documentation/" + path.relative_to(docs).as_posix())
+    expected_runtime = {"SKSE/Plugins/HellbladeTimedBlock.dll", "SKSE/Plugins/HellbladePlayerTime.ini"}
+    actual_runtime = {path.relative_to(stage).as_posix() for path in stage.rglob("*") if path.is_file()}
+    if actual_runtime != expected_runtime:
+        raise RuntimeError("Unexpected or missing runtime file in Hellblade installer")
     payload = {relative: digest(path) for path, relative in files(stage)}
     payload["SKSE/Plugins/HellbladeTimedBlock.dll"] = digest(plugins / dll.name)
     package = args.output / "Hellblade - Player Time Independence.zip"
@@ -157,7 +169,7 @@ Official baseline and upstream project identity are recorded in baseline.json an
         for name, expected in payload.items():
             if hashlib.sha256(archive.read(name)).hexdigest() != expected:
                 raise RuntimeError(f"Package content mismatch: {name}")
-    shutil.copy2(pdb, args.output / pdb.name)
+    shutil.copy2(pdb, symbols / pdb.name)
     record = {
         "name": "Hellblade - Player Time Independence",
         "game_tested": False,
@@ -165,6 +177,8 @@ Official baseline and upstream project identity are recorded in baseline.json an
         "pdb_sha256": digest(pdb),
         "package_sha256": digest(package),
         "source_zip_sha256": digest(source_zip),
+        "source_archive": str(source_zip),
+        "runtime_only": True,
         "native_build": str(args.build),
         "tests_passed": 5,
         "local_build": "1.3.5.5",
@@ -183,7 +197,7 @@ Official baseline and upstream project identity are recorded in baseline.json an
     }
     for folder in ("source", "tests", "assets"):
         record["maintained_source"].update({folder + "/" + relative: digest(path) for path, relative in files(root / folder)})
-    args.output.joinpath("BUILD.json").write_text(json.dumps(record, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    internal.joinpath("HELLBLADE_BUILD.json").write_text(json.dumps(record, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     print(json.dumps({"package": str(package), "dll_sha256": record["dll_sha256"], "pdb_sha256": record["pdb_sha256"], "files": len(payload), "tests_passed": 5, "game_tested": False}, ensure_ascii=False))
 
 

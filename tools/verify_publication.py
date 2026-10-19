@@ -7,6 +7,7 @@ import tomllib
 import zipfile
 from nif_schema import CandidateNif
 from bsa_index import names
+from runtime_payload import is_runtime_file
 
 
 def main():
@@ -61,7 +62,7 @@ def main():
             assert len(z.namelist()) == len(set(z.namelist()))
             assert set(z.namelist()) == set(files)
             assert all(z.read(rel) == p.read_bytes() for rel, p in files.items())
-            assert 'Docs/RedsandParticles/SOURCE.zip' in z.namelist()
+            assert all(is_runtime_file(name) for name in z.namelist())
         result['archive_sha256'] = hashlib.sha256(args.archive.read_bytes()).hexdigest()
     print(json.dumps(result))
 

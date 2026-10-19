@@ -10,6 +10,7 @@ import tempfile
 import tomllib
 import xml.etree.ElementTree as ET
 import zipfile
+from runtime_payload import is_runtime_file, runtime_payload
 
 
 def project(archive, root, flags):
@@ -54,13 +55,16 @@ def main():
     route_name = 'SKSE/Plugins/RedsandImpactVFX.toml'
     groups = []
     decoded = set()
+    used_archive_files = {'fomod/ModuleConfig.xml', 'fomod/info.xml'}
     default_flags = {}
     default_payload = None
     with zipfile.ZipFile(args.runtime) as r:
-        runtime = {name: r.read(name) for name in r.namelist()}
+        runtime = runtime_payload({name: r.read(name) for name in r.namelist()})
     base_routes = tomllib.loads(runtime[route_name].decode('utf-8-sig'))['Route']
     with zipfile.ZipFile(args.archive) as z:
         assert len(z.namelist()) == len(set(z.namelist()))
+        assert all(name.startswith(('Core/', 'Compatibility/', 'Options/')) or
+                   name in {'fomod/ModuleConfig.xml', 'fomod/info.xml'} for name in z.namelist())
         root = ET.fromstring(z.read('fomod/ModuleConfig.xml'))
         assert root.tag == 'config'
         for group in root.findall('./installSteps/installStep/optionalFileGroups/group'):
@@ -83,15 +87,18 @@ def main():
         for name in z.namelist():
             if name.startswith(('Core/', 'Compatibility/')):
                 relative = name.split('/', 1)[1] if name.startswith('Core/') else name.split('/', 2)[2]
+                assert is_runtime_file(relative), relative
                 assert z.read(name) == runtime[relative], relative
         count = 0
         for values in itertools.product(*groups):
             flags = dict(values)
             payload = project(z, root, flags)
+            used_archive_files.update(payload.values())
             assert ini_name in payload and route_name in payload
             assert not any(PurePosixPath(n).suffix.lower() in {'.esp', '.esm', '.esl', '.wav', '.xwm', '.fuz'} for n in payload)
             assert not any(n.startswith(('Core/', 'Compatibility/', 'Options/', 'fomod/')) for n in payload)
-            assert 'SKSE/Plugins/Precision.dll' in payload and 'Docs/RedsandParticles/SOURCE.zip' in payload
+            assert 'SKSE/Plugins/Precision.dll' in payload
+            assert all(is_runtime_file(name) for name in payload)
             cfg = configparser.ConfigParser()
             cfg.read_string(z.read(payload[ini_name]).decode('utf-8-sig'))
             original = configparser.ConfigParser()
@@ -127,6 +134,7 @@ def main():
                 default_payload = {n: z.read(source) for n, source in payload.items()}
             count += 1
         assert count == 8 and default_payload is not None
+        assert used_archive_files == set(z.namelist()), 'Unreferenced installer files'
         assert set(default_payload) == set(runtime)
         defaults = configparser.ConfigParser()
         defaults.read_string(default_payload[ini_name].decode('utf-8-sig'))
@@ -144,7 +152,7 @@ def main():
                 target.parent.mkdir(parents=True, exist_ok=True)
                 target.write_bytes(content)
     result = {'passed': True, 'variants': count, 'production_decoded_manifest_variants': len(decoded),
-              'default_files': len(default_payload), 'esp_esl_required': False, 'game_or_ui_tested': False,
+              'default_files': len(default_payload), 'runtime_only': True, 'esp_esl_required': False, 'game_or_ui_tested': False,
               'defaultPayloadSHA256': {n: hashlib.sha256(b).hexdigest() for n, b in sorted(default_payload.items())}}
     if args.manifest:
         manifest = json.loads(args.manifest.read_text('utf-8-sig'))

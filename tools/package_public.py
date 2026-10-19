@@ -4,6 +4,7 @@ import argparse
 import hashlib
 import json
 import zipfile
+from runtime_payload import runtime_payload
 
 
 def sha(data):
@@ -32,7 +33,9 @@ def main():
     args = parser.parse_args()
     root = args.root.resolve()
     output = args.archive.resolve().parent
-    source_zip = output / 'Redsand Particles - Corresponding Source.zip'
+    source_output = root / 'output/BuildData/Sources'
+    source_output.mkdir(parents=True, exist_ok=True)
+    source_zip = source_output / 'Redsand Particles - Corresponding Source.zip'
     manifest = json.loads(args.manifest.read_text('utf-8-sig'))
     with zipfile.ZipFile(args.archive) as runtime:
         assert len(runtime.namelist()) == len(set(runtime.namelist()))
@@ -42,24 +45,9 @@ def main():
                      for p in sorted((root / 'source').rglob('*')) if p.is_file()}
     if 'sourceSHA256' in manifest:
         assert {k: v.lower() for k, v in manifest['sourceSHA256'].items()} == source_hashes
-    runtime_docs = {}
     public_readme = root / 'README-PUBLIC.md'
     if not public_readme.is_file():
         public_readme = root / 'README.md'
-    for name in ['README.md', 'BUILDING.md', 'THIRD_PARTY.md', 'ASSET_LICENSES.md', 'COMPATIBILITY.md', 'COMPATIBILITY.zh-CN.md']:
-        document = public_readme if name == 'README.md' else root / name
-        if document.is_file():
-            runtime_docs['Docs/RedsandParticles/' + name] = document.read_bytes()
-    instructions = root / 'docs/INSTALL.zh-CN.txt'
-    if instructions.is_file():
-        runtime_docs['Docs/RedsandParticles/INSTALL.zh-CN.txt'] = instructions.read_bytes()
-    runtime_docs['Docs/RedsandParticles/Licenses/PROJECT-GPL-3.0.txt'] = (root / 'LICENSE').read_bytes()
-    for p in (root / 'licenses').rglob('*'):
-        if p.is_file():
-            runtime_docs['Docs/RedsandParticles/Licenses/' + p.relative_to(root / 'licenses').as_posix()] = p.read_bytes()
-    for p in (root / 'docs/SourceAssets').rglob('*'):
-        if p.is_file():
-            runtime_docs['Docs/RedsandParticles/SourceAssets/' + p.relative_to(root / 'docs/SourceAssets').as_posix()] = p.read_bytes()
     provenance_path = root / 'SOURCE-PROVENANCE.json'
     provenance = json.loads(provenance_path.read_text('utf-8')) if provenance_path.is_file() else {
         'precision_revision': manifest.get('precisionCommit'),
@@ -67,27 +55,25 @@ def main():
     }
     provenance.update(current_precision_dll_sha256=sha(precision), current_maxsu_dll_sha256=sha(maxsu),
                       current_native_source_sha256=source_hashes,
-                      source_delivery='Complete source archive supplied alongside and inside runtime ZIP',
+                      source_delivery='Separate corresponding-source archive; runtime ZIP contains only game files',
                       dp_enabled=False)
     (root / 'SOURCE-PROVENANCE.json').write_text(json.dumps(provenance, indent=2) + '\n', 'utf-8')
     with zipfile.ZipFile(source_zip, 'w', zipfile.ZIP_DEFLATED, compresslevel=9) as z:
         for p, rel in source_files(root):
             z.write(public_readme if rel == 'README.md' else p, rel)
-    temporary = output / (args.archive.stem + '.with-source.tmp.zip')
+    temporary = output / (args.archive.stem + '.runtime.tmp.zip')
     with zipfile.ZipFile(args.archive) as old, zipfile.ZipFile(temporary, 'w', zipfile.ZIP_DEFLATED, compresslevel=9) as new:
-        for name in old.namelist():
-            if name != 'Docs/RedsandParticles/SOURCE.zip' and name not in runtime_docs:
-                new.writestr(name, old.read(name))
-        for name, content in runtime_docs.items():
+        payload = runtime_payload({name: old.read(name) for name in old.namelist()})
+        for name, content in payload.items():
             new.writestr(name, content)
-        new.write(source_zip, 'Docs/RedsandParticles/SOURCE.zip')
     temporary.replace(args.archive)
     with zipfile.ZipFile(args.archive) as z:
         payload = {name: sha(z.read(name)) for name in sorted(z.namelist())}
     manifest.update(runtimePayloadSHA256=payload, packageSHA256=sha(args.archive.read_bytes()),
                     correspondingSourceSHA256=sha(source_zip.read_bytes()),
                     correspondingSourceFiles=sum(1 for _ in source_files(root)),
-                    publicationPackage=True, donationPointsEnabled=False,
+                    publicationPackage=True, donationPointsEnabled=False, runtimeOnly=True,
+                    correspondingSourceArchive=str(source_zip.relative_to(root)),
                     requiresChaosTrailReplacer=False, includesPrecisionRibbonOverride=False,
                     precisionRibbonColorIndependent=True, particlesUseOwnEnchantmentPalette=True,
                     particleEnchantmentCompatibilityColorFallback=True, particleCopiesRibbonSettings=False)
