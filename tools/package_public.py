@@ -17,6 +17,8 @@ def source_files(root):
     excluded_suffixes = {'.dll', '.pdb', '.obj', '.lib', '.exe', '.pyc', '.ilk', '.exp'}
     for p in sorted(root.rglob('*')):
         relative = p.relative_to(root)
+        if relative.parts[0].casefold() == 'hellbladeplayertime':
+            continue
         if p.name in private_names or p.name.startswith('.redsand-') or any(part in excluded_dirs for part in relative.parts):
             continue
         if p.is_symlink():
