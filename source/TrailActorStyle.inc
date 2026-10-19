@@ -4,5 +4,5 @@ redsandConfig = RedsandSettings::Get();
 		const bool redsandStaff = redsandWeapon && redsandWeapon->GetWeaponType() == RE::WEAPON_TYPE::kStaff;
 		const auto redsandActor = a_actorHandle.get();
 		redsandActorIsPlayer = redsandActor && redsandActor->IsPlayerRef();
-		redsandScopeAllowed = redsandActor && Redsand::Weapons::MeleeScopeAllowed(redsandConfig, redsandActorIsPlayer, redsandStaff);
+		redsandScopeAllowed = !redsandNativeOnly && redsandActor && Redsand::Weapons::MeleeScopeAllowed(redsandConfig, redsandActorIsPlayer, redsandStaff);
 		redsandLegacyTrail = !redsandScopeAllowed;

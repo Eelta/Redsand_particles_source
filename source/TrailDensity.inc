@@ -1,10 +1,18 @@
 const auto redsandRequestedMesh = redsandConfig.diagnostics ? trailMeshPath : std::string{};
-		trailMeshPath = Redsand::Weapons::ResolveMeleeMesh(redsandScopeAllowed, trailMeshPath, Settings::attackTrailMeshPath);
+		bool redsandRequestedMeshAvailable = true;
+		if (!redsandScopeAllowed && Redsand::Weapons::IsLEDWeaponMesh(trailMeshPath)) {
+			RE::BSResourceNiBinaryStream redsandRibbonResource("Meshes\\" + trailMeshPath);
+			redsandRequestedMeshAvailable = redsandRibbonResource.good();
+		}
+		trailMeshPath = Redsand::Weapons::ResolveMeleeMesh(redsandScopeAllowed, trailMeshPath, Settings::attackTrailMeshPath,
+			redsandRequestedMeshAvailable);
+		if (redsandNativeOnly && trailMeshPath.empty()) { trailMeshPath = "Effects/WeaponTrails/AttackTrail.nif"; }
 		if (!redsandLegacyTrail && (trailMeshPath == Settings::attackTrailMeshPath || trailMeshPath == "Effects/WeaponTrails/AttackTrailMagic.nif")) {
 			trailMeshPath = "RedsandParticles/Default.nif";
 		}
 		if (!redsandLegacyTrail && !baseColorOverride) {
-			baseColorOverride = RE::NiColorA{ 0.025f, 0.080f, 0.650f, 1.f };
+			const auto tint = Redsand::Weapons::defaultTrailTint;
+			baseColorOverride = RE::NiColorA{ tint.red, tint.green, tint.blue, 1.f };
 		}
 		if (!redsandLegacyTrail) {
 			trailMeshPath = Redsand::Weapons::MapMeshPath(trailMeshPath, redsandWeaponProfile);
@@ -19,6 +27,7 @@ const auto redsandRequestedMesh = redsandConfig.diagnostics ? trailMeshPath : st
 				}
 			}
 		}
+		redsandParticleSelected = Redsand::Weapons::IsParticleMesh(trailMeshPath);
 		if (redsandConfig.diagnostics) {
 			RedsandLog::info("Redsand melee scope: actor={:08X} player={} weapon={:08X} weaponType={} profile={} enabled={} playerEnabled={} npcEnabled={} allowed={} requested={} resolved={}",
 				redsandActor ? redsandActor->GetFormID() : 0, redsandActorIsPlayer,

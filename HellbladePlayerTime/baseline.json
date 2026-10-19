@@ -1,0 +1,28 @@
+{
+  "official_url": "https://gitlab.com/moon_river/hellbladere",
+  "commit": "e21165d54fe99a4d3d9e36ea2556fccfba9a55c7",
+  "source_hashes": {
+    "cmake/version.rc.in": "3b86a481f5e94b06bffb933ede18c88b9e68d33e3c938ffecbf79b2df710e212",
+    "extern/PrecisionAPI.h": "0fe6174850a93eaaf0451bdea05ab6b942cffbdced6990f95c5986ca35d1f67d",
+    "extern/TrueDirectionalMovementAPI.h": "0233750e098298a428a33b2acd580cce66b1e425f93faa2d89f760c760102b7f",
+    "include/block_handler.hpp": "342cadcf0592ca743c9ed40d3a8087c797f2f6ca7706886b906493cbdabdc797",
+    "include/easings.hpp": "0def6a96228388a6754879d76bbdd72078a32d47a83d3c6cd12b16993c4765fd",
+    "include/forms.hpp": "4c6475c58e3e57c669d8ec87dd76f44be3ccc6a84bde9a5169fc4cd79500645c",
+    "include/hooks.hpp": "1390935e6829fd244138b6baeab3e3e365b003ec7e70aeaa9cf60f51ba597a1a",
+    "include/papyrus.hpp": "f825e84185602b1d86763bc93a91b5ab131df5b797394dd5733b59c75c1ec811",
+    "include/pch.hpp": "518c6c235adc19502210908f28f3cdab03e63e6ab0111507065a0e1572cb8547",
+    "include/settings.hpp": "1fb0a11a90c7ae0338ec16754af4af632af370528d0c64ce4ef1e7147aed8182",
+    "include/slowdown_helper.hpp": "994deb79ef6946f7ce34f78c86d5dea935b41321f4dc857b1eb5621a87a295db",
+    "include/util.hpp": "487f97ea29bf2eb3cb82e2c12081d363eef099ea4e4afddd7fe5df4ae7eb8b7c",
+    "src/block_handler.cpp": "c6a79ccbf3a97beab6bb91063d6e751945ed12d30c66dbcb3105504c5da5b2c4",
+    "src/forms.cpp": "778aabf63bf912bf915a910f85c6e2083bb96abcef77fbd2152cd07cfb91a0cd",
+    "src/hooks.cpp": "ddaec5e4279e6101c08e92fd438e07b41aab1c813e29bf8499b2b7fcfc16e894",
+    "src/papyrus.cpp": "155574f70145d0045974e74775f593c271474b861eed67c6a70677c0d31b16dd",
+    "src/plugin.cpp": "0b9b0e5e8ad4e90af6a94f635c3a94e328036c451fa7a16c0f4c86a03fd86beb",
+    "src/settings.cpp": "eca0a6ca1cb4237ea70f912711d33b71b9f906caf9f186bbd34873420a27a509",
+    "src/util.cpp": "33cc9f460bc9a3a66fe270824eb2dfc9942f68ec7b00e34ad42aae0dfdb318e7",
+    "src/RE/ActorMediator.cpp": "263be4d07306b1dbf2ada3e87216ca9169e6ac46dd3b851fb3d2e02c016f321a",
+    "include/RE/ActorMediator.hpp": "c783c4bc67c106086585fd3689a7d2bb10953d92218a508a350c83492aa0e424"
+  },
+  "scope": "Local derivative; original installed mod untouched; upstream build metadata says 1.3.2; do not claim byte-identical 1.3.5.1 reconstruction."
+}

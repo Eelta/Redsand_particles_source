@@ -191,6 +191,7 @@ namespace RedsandBowParticles
 			RE::NiPointer<RE::NiParticleSystem> system;
 			RE::NiAVObject* rendererRoot = nullptr;
 			RE::NiColorA color{ 0.025f, 0.080f, 0.650f, 1.f };
+			RE::NiColorA rendererColor{ 0.f, 0.f, 0.f, 0.f };
 			std::string meshPath;
 			RE::FormID weaponID = 0;
 			Vec3 tip;
@@ -294,7 +295,7 @@ namespace RedsandBowParticles
 			AttackTrail selector(nullptr, actor->GetHandle(), nullptr, nullptr, false, false);
 			TrailDefinition definition;
 			auto* entry = BowEntry(actor, weaponID);
-			if (selector.GetTrailDefinition(actor->GetHandle(), entry, entry == actor->GetEquippedEntryData(true), definition) && definition.trailOverride.baseColorOverride) {
+			if (selector.GetTrailDefinition(actor->GetHandle(), entry, entry == actor->GetEquippedEntryData(true), definition, true) && definition.trailOverride.baseColorOverride) {
 				return *definition.trailOverride.baseColorOverride;
 			}
 			return { 0.025f, 0.080f, 0.650f, 1.f };

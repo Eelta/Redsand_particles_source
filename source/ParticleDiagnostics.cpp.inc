@@ -1,5 +1,18 @@
 void AttackTrail::LogRedsandParticles(RE::BSGeometry* geometry, std::string_view stage)
 {
+	if (stage == "initialized"sv && geometry && !redsandLegacyTrail && geometry->name == "RedsandParticles_Drain_v1"sv) {
+		static std::array<std::atomic<unsigned>, 4> actualColors{};
+        const auto tint = Redsand::Weapons::defaultTrailTint;
+        const bool blue = redsandInheritedColor.red == tint.red && redsandInheritedColor.green == tint.green && redsandInheritedColor.blue == tint.blue;
+        const auto partition = (redsandActorIsPlayer ? 2u : 0u) + (blue ? 1u : 0u);
+        if (actualColors[partition].fetch_add(1) < 6) {
+			auto* shader = netimmerse_cast<RE::BSEffectShaderProperty*>(geometry->GetGeometryRuntimeData().shaderProperty.get());
+			auto* material = shader ? shader->GetMaterial() : nullptr;
+			if (material) { logger::info("Redsand rendered melee: rgb={}/{}/{} glow={} alpha={} texture={}",
+				material->baseColor.red, material->baseColor.green, material->baseColor.blue,
+				material->baseColorScale, material->baseColor.alpha, material->sourceTexturePath.c_str()); }
+		}
+	}
 	if (!redsandConfig.diagnostics || redsandLegacyTrail || !geometry || geometry->name != "RedsandParticles_Drain_v1"sv) { return; }
 	const float clock = currentTime + redsandDrain.elapsed;
 	if (stage == "frame"sv && clock < redsandNextDiagnostic) { return; }

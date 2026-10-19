@@ -1,5 +1,5 @@
 {
-  "packageVersion": "0.5.7",
+  "packageVersion": "0.5.16",
   "precisionRepository": "https://github.com/ersh1/Precision.git",
   "precisionRef": "9ef45e0d8d9e3cf8b2df444f05142c1e7bf41cd4",
   "commonLibRepository": "https://github.com/alandtse/CommonLibSSE-NG.git",

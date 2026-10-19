@@ -22,13 +22,17 @@ struct RendererDiagnostics
 			auto* copy = static_cast<RE::BSEffectShaderMaterial*>(material->Create());
 			if (!copy) { return false; }
 			copy->CopyMembers(material);
-			copy->baseColor = stream.color;
-			const float peak = std::max({ stream.color.red, stream.color.green, stream.color.blue, 0.f });
+			const auto config = RedsandSettings::Get();
+			const auto& custom = config.colors[static_cast<unsigned>(RedsandSettings::ColorTarget::Bow)];
+			const RE::NiColorA color = custom.custom ? RE::NiColorA{ custom.rgb[0], custom.rgb[1], custom.rgb[2], stream.color.alpha } : stream.color;
+			copy->baseColor = color;
+			const float peak = std::max({ color.red, color.green, color.blue, 0.f });
 			copy->baseColorScale = peak > 0.f ? 2.6f * 5.4f * brightness / peak : 0.f;
 			shader->SetMaterial(copy, true);
 			copy->~BSEffectShaderMaterial();
 			RE::free(copy);
 			stream.rendererBrightness = brightness;
+			stream.rendererColor = color;
 			return true;
 		}
 
@@ -133,7 +137,10 @@ struct RendererDiagnostics
 				if (usable) {
 					if (stream.rendererResourcesPending && diagnostics) { ++rendererDiagnostics.recovered; }
 					stream.rendererResourcesPending = false;
-					if (stream.rendererBrightness != brightness) { ConfigureRendererMaterial(stream, system, brightness); }
+					const auto config = RedsandSettings::Get();
+					const auto& custom = config.colors[static_cast<unsigned>(RedsandSettings::ColorTarget::Bow)];
+					const RE::NiColorA wanted = custom.custom ? RE::NiColorA{ custom.rgb[0], custom.rgb[1], custom.rgb[2], stream.color.alpha } : stream.color;
+					if (stream.rendererBrightness != brightness || stream.rendererColor.red != wanted.red || stream.rendererColor.green != wanted.green || stream.rendererColor.blue != wanted.blue) { ConfigureRendererMaterial(stream, system, brightness); }
 					if (diagnostics) { ReportRendererMaterial(stream, system); }
 					return RendererStatus::Ready;
 				}

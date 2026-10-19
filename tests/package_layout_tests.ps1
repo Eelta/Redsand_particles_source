@@ -1,4 +1,4 @@
-﻿param(
+param(
     [Parameter(Mandatory = $true)][string]$StagePath,
     [Parameter(Mandatory = $true)][string]$AssetsPath,
     [Parameter(Mandatory = $true)][string]$ManifestPath,
@@ -57,6 +57,19 @@ foreach ($asset in Get-ChildItem -LiteralPath $runtimeAssets -Recurse -File) {
     $relative = $asset.FullName.Substring($runtimeAssets.Length + 1)
     if (IsRuntimeAsset $relative) { $expectedFiles[$relative] = $asset.FullName }
 }
+$impactAssets = Join-Path $assets 'ImpactVFX'
+$impactFiles = @{}
+$impactMifFiles = @(Get-Content -LiteralPath (Join-Path (Split-Path -Parent $PSScriptRoot) 'tools/impact_mif_allowlist.json') -Raw | ConvertFrom-Json)
+$impactCompatFiles = @(Get-Content -LiteralPath (Join-Path (Split-Path -Parent $PSScriptRoot) 'tools/impact_compat_allowlist.json') -Raw | ConvertFrom-Json)
+if (Test-Path -LiteralPath $impactAssets -PathType Container) {
+    foreach ($asset in Get-ChildItem -LiteralPath $impactAssets -Recurse -File) {
+        $relative = $asset.FullName.Substring($impactAssets.Length + 1)
+        Require ($relative -match '^(SKSE[\\/]CoreImpactFramework[\\/]StellarImpact\.json|SKSE[\\/]Plugins[\\/]RedsandImpactVFX\.toml|Meshes[\\/]StellarImpact[\\/].+\.nif|Textures[\\/]StellarImpact[\\/].+\.dds|Docs[\\/]StellarImpact[\\/](README-zh-CN|CREDITS)\.md)$' -or $relative.Replace('\', '/') -in $impactMifFiles -or $relative.Replace('\', '/') -in $impactCompatFiles) "Unapproved ImpactVFX module path: $relative"
+        Require (-not $expectedFiles.ContainsKey($relative)) "ImpactVFX module overwrites a Basic asset: $relative"
+        $impactFiles[$relative] = $asset.FullName
+        $expectedFiles[$relative] = $asset.FullName
+    }
+}
 $expectedFiles['SKSE\Plugins\Precision.dll'] = $null
 $expectedDirectories = @{}
 foreach ($relative in $expectedFiles.Keys) {
@@ -81,7 +94,9 @@ foreach ($item in Get-ChildItem -LiteralPath $stage -Recurse -Force) {
 Require ($installed.Count -eq $expectedFiles.Count) 'Runtime package file count does not match the runtime asset set and DLL'
 foreach ($relative in $expectedFiles.Keys) { $null = StageFile $relative }
 $pluginsInPackage = @(Get-ChildItem -LiteralPath $stage -Recurse -File | Where-Object { $_.Extension -in @('.esp', '.esm', '.esl') })
-Require ($pluginsInPackage.Count -eq 0) 'Redsand must not package ESP, ESM or ESL plugins'
+$expectedPlugins = @()
+Require ($pluginsInPackage.Count -eq $expectedPlugins.Count) 'Unexpected ESP, ESM or ESL in the runtime package'
+foreach ($plugin in $pluginsInPackage) { Require ($plugin.DirectoryName -eq $stage -and $plugin.Name -in $expectedPlugins) "Unapproved plugin: $($plugin.FullName)" }
 Require (@(Get-ChildItem -LiteralPath $stage -Recurse -Filter '*.pex' -File).Count -eq 0) 'The runtime menu must not require Papyrus scripts'
 foreach ($required in @('SKSE\Plugins\Precision.dll', 'SKSE\Plugins\RedsandParticles.ini', 'SKSE\Plugins\Precision\Precision_ElementalDesert.toml', 'Meshes\RedsandParticles\Default.nif', 'Textures\RedsandParticles\Default.dds')) {
     Require (Test-Path -LiteralPath (Join-Path $stage $required) -PathType Leaf) "Missing required runtime file: $required"
@@ -92,9 +107,10 @@ $styleTextureRoot = Join-Path $stage 'Textures\RedsandParticles'
 Require (Test-Path -LiteralPath $styleMeshRoot -PathType Container) 'Missing weapon style meshes'
 Require (Test-Path -LiteralPath $styleTextureRoot -PathType Container) 'Missing weapon shape textures'
 Require (@(Get-ChildItem -LiteralPath $styleMeshRoot -Directory).Count -eq 0) 'Weapon meshes must use one flat folder'
-Require (@(Get-ChildItem -LiteralPath $styleTextureRoot -Directory).Count -eq 0) 'Particle textures must use one flat folder'
-Require (@(Get-ChildItem -LiteralPath $stage -Recurse -File -Filter '*.nif').Count -eq 10) 'Expected ten shared-color particle NIFs'
-Require (@(Get-ChildItem -LiteralPath $stage -Recurse -File -Filter '*.dds').Count -eq 10) 'Expected default texture and nine weapon shape DDS textures'
+Require (@(Get-ChildItem -LiteralPath $styleTextureRoot -Directory | Where-Object Name -NE 'PrecisionTintSync').Count -eq 0) 'Unexpected particle texture subdirectory'
+Require (@(Get-ChildItem -LiteralPath $styleMeshRoot -Recurse -File -Filter '*.nif').Count -eq 10) 'Expected ten shared-color particle NIFs'
+Require (@(Get-ChildItem -LiteralPath $styleTextureRoot -File -Filter '*.dds').Count -eq 10) 'Expected default texture and nine weapon shape DDS textures'
+Require (@(Get-ChildItem -LiteralPath $styleTextureRoot -Recurse -File -Filter '*.dds').Count -eq 10) 'Expected ten particle textures; external Precision gradients are not redistributed'
 Require (-not (Test-Path -LiteralPath (Join-Path $styleMeshRoot 'Staff'))) 'Removed staff style must not be packaged'
 Require (-not (Test-Path -LiteralPath (Join-Path $styleTextureRoot 'Staff.dds'))) 'Removed staff texture must not be packaged'
 foreach ($profile in @('Default') + $weaponProfiles) {
@@ -106,9 +122,18 @@ Require ($installed.ContainsKey('SKSE\Plugins\Precision.dll')) 'Required game fi
 $settings = ReadSettings (StageFile 'SKSE\Plugins\RedsandParticles.ini')
 $defaults = @{
     Menu = @{ Language='English'; DiagnosticLogging='false' }
-    SwordParticles = @{ Enabled='true'; Player='true'; NPC='true'; Tip='true'; Brightness='1.0'; Density='1.0'; Spread='1.0'; Size='1.0' }
-    BowParticles = @{ Enabled='true'; Player='true'; NPC='true'; Brightness='1.0'; Density='1.0'; Gathering='true'; Rings='true'; Trails='true' }
+    SwordParticles = @{ Enabled='true'; Player='true'; NPC='true'; Tip='true'; KeepPrecisionTrail='true'; Brightness='1'; Density='1'; Spread='1'; Size='1' }
+    BowParticles = @{ Enabled='true'; Player='true'; NPC='true'; Brightness='1'; Density='1'; Gathering='true'; Rings='true'; Trails='true' }
+    ImpactVFX = @{ Enabled='true'; Hit='true'; Slash='true'; RandomSlashColor='false'; RandomSlashValues='false'; RandomSlashRange='0.5'; Block='true'; PreserveValhallaRing='true'; Brightness='1'; Density='1'; Size='1'; SlashDistance='1'; SlashSpread='1'; SlashDensity='1'; CutLength='1' }
+    BlockLightning = @{ Enabled='false'; RandomTrigger='true'; Chance='0.10'; RandomColor='false'; Brightness='1'; Size='1'; R='0.12'; G='0.58'; B='1' }
 }
+$defaults['Color.Melee'] = @{ Enabled='false'; R='0.0384615'; G='0.123077'; B='1' }
+$defaults['Color.Bow'] = @{ Enabled='false'; R='0.0384615'; G='0.123077'; B='1' }
+$defaults['Color.Hit'] = @{ Enabled='true'; R='1'; G='0.72'; B='0.24' }
+$defaults['Color.SlashSparks'] = @{ Enabled='true'; R='1'; G='0.72'; B='0.24' }
+$defaults['Color.Cut'] = @{ Enabled='true'; R='0.835886'; G='0.537747'; B='0' }
+$defaults['Color.Block'] = @{ Enabled='true'; R='1'; G='0.72'; B='0.24' }
+$defaults['Color.Wave'] = @{ Enabled='true'; R='1'; G='0.84'; B='0.45' }
 Require (-not $settings.ContainsKey('StaffParticles')) 'Removed staff settings must not be packaged'
 Require ($settings.Count -eq $defaults.Count) 'Unexpected or missing INI sections'
 foreach ($section in $defaults.Keys) {
@@ -171,7 +196,8 @@ print('PASS: 10 packaged NIFs retain particle controllers and resolve their flat
 Require ($LASTEXITCODE -eq 0) 'Packaged NIF/controller validation failed'
 $manifest = Get-Content -LiteralPath $manifestFile -Raw | ConvertFrom-Json
 Require ($manifest.packageFormat -eq 'RuntimeFiles') 'Manifest packageFormat must be RuntimeFiles'
-Require ($manifest.PSObject.Properties.Name -contains 'packageVersion' -and $manifest.packageVersion -eq '0.5.7') 'Manifest packageVersion must be 0.5.7'
+$expectedVersion = (Get-Content -LiteralPath (Join-Path (Split-Path -Parent $PSScriptRoot) 'build.json') -Raw | ConvertFrom-Json).packageVersion
+Require ($manifest.PSObject.Properties.Name -contains 'packageVersion' -and $manifest.packageVersion -eq $expectedVersion) 'Manifest packageVersion must match build.json'
 Require ($manifest.PSObject.Properties.Name -contains 'redsandESPRequired' -and $manifest.redsandESPRequired -is [bool] -and !$manifest.redsandESPRequired) 'Redsand must not require its legacy ESP'
 Require ($manifest.PSObject.Properties.Name -contains 'independentDiagnosticLog' -and $manifest.independentDiagnosticLog -ceq 'RedsandParticles.log') 'Diagnostics must use the independent RedsandParticles.log file'
 Require ($manifest.PSObject.Properties.Name -contains 'diagnosticLoggingDefault' -and $manifest.diagnosticLoggingDefault -is [bool] -and !$manifest.diagnosticLoggingDefault) 'Diagnostic logging must default to off'
@@ -183,6 +209,26 @@ foreach ($field in @('redsandRealtimeMenu', 'runtimeParticleSettings', 'bowConti
     Require ($manifest.PSObject.Properties.Name -contains $field -and $manifest.$field -eq 1) "Missing runtime-settings provenance: $field"
 }
 Require ($manifest.PSObject.Properties.Name -contains 'swordTipAttachment' -and $manifest.swordTipAttachment -eq 2) 'Sword-tip provenance must declare the swept-emitter implementation'
+Require ($manifest.PSObject.Properties.Name -contains 'optionalPrecisionRibbonAlongsideParticles' -and $manifest.optionalPrecisionRibbonAlongsideParticles -eq $true) 'Missing independent Precision ribbon provenance'
+Require ($manifest.PSObject.Properties.Name -contains 'keepPrecisionTrailDefault' -and $manifest.keepPrecisionTrailDefault -eq $true) 'Approved dual trails should be the default'
+Require ($manifest.impactVFXControls -eq 3 -and $manifest.impactVFXContinuous -eq $true) 'Missing continuous impact runtime-control provenance'
+Require (($manifest.impactVFXBrightnessRange -join ',') -eq '0,20' -and ($manifest.impactVFXDensityRange -join ',') -eq '0,10' -and ($manifest.impactVFXSizeRange -join ',') -eq '0.05,10') 'Continuous control range mismatch'
+Require ($manifest.impactVFXNativeMeasuredSlash -eq 1) 'Native measured slash must be declared'
+Require (($manifest.impactVFXModelRouteTypes -join ',') -eq 'IPCT,EXPL,PROJ') 'Impact route type provenance is incomplete'
+Require (($manifest.impactVFXDefaultLevels -join ',') -eq '2,2,2') 'Impact controls must default to B2D2S2'
+Require (($manifest.impactVFXBrightnessLevels -join ',') -eq '0.1,0.5,1,12') 'Incorrect brightness level labels'
+Require (($manifest.impactVFXDensityLevels -join ',') -eq '0.1,0.5,1,6') 'Incorrect density level labels'
+Require (($manifest.impactVFXSizeLevels -join ',') -eq '0.1,0.5,1,6') 'Incorrect size level labels'
+Require ($manifest.impactVFXAssetModule -eq ($impactFiles.Count -gt 0)) 'Impact module inclusion does not match build provenance'
+Require (@($manifest.impactVFXAssetSHA256.PSObject.Properties).Count -eq $impactFiles.Count) 'Impact module checksum coverage mismatch'
+foreach ($relative in $impactFiles.Keys) {
+    $key = $relative.Replace('\', '/')
+    Require ($manifest.impactVFXAssetSHA256.$key -eq (Get-FileHash -LiteralPath (StageFile $relative) -Algorithm SHA256).Hash) "Impact module checksum mismatch: $relative"
+}
+if ($impactFiles.Count) {
+    & $PythonPath -I -B (Join-Path $PSScriptRoot 'impact_package_tests.py') $stage
+    Require ($LASTEXITCODE -eq 0) 'Impact module package validation failed'
+}
 foreach ($field in @('swordTipSweptEmitter', 'swordEmitterObjectTraversal', 'staffParticlesRemoved', 'swordSpreadControl', 'swordSizeControl', 'bilingualMenu', 'sharedWeaponColorMeshes', 'flatParticleAssetPaths')) {
     Require ($manifest.PSObject.Properties.Name -contains $field -and $manifest.$field -is [bool] -and $manifest.$field) "Missing 0.5.7 runtime provenance: $field"
 }
@@ -212,4 +258,4 @@ foreach ($property in $manifest.sourceSHA256.PSObject.Properties) {
     Require ($property.Value -match '^[0-9a-fA-F]{64}$' -and $property.Value -eq (Get-FileHash -LiteralPath $sourceFile -Algorithm SHA256).Hash) "Source checksum mismatch: $($property.Name)"
 }
 Require (@(Get-ChildItem -LiteralPath $sourceRoot -Recurse -File).Count -eq @($manifest.sourceSHA256.PSObject.Properties).Count) 'Local build manifest must cover every source file'
-Write-Output 'PASS: 0.5.7 flat runtime files only, ten shared-color NIFs, ten DDS textures, no ESP/ESM/ESL, bilingual/melee/bow defaults and local asset/DLL/source provenance'
+Write-Output 'PASS: approved runtime files, preserved melee/bow assets, optional ImpactVFX module, bilingual/control defaults and local asset/DLL/source provenance'

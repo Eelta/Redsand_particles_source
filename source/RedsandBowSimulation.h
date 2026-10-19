@@ -1,5 +1,7 @@
 #pragma once
 
+#include "RedsandSettings.h"
+
 #include <algorithm>
 #include <array>
 #include <cmath>
@@ -293,7 +295,7 @@ namespace Redsand::Bow
 		static bool ValidDensity(float& density)
 		{
 			if (!std::isfinite(density) || density <= 0.f) { return false; }
-			density = std::clamp(density, 0.05f, 2.f);
+			density = std::clamp(density, 0.05f, RedsandSettings::maxDensity);
 			return true;
 		}
 		float Range(float low, float high)

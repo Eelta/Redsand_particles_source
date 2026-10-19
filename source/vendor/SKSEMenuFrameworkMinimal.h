@@ -1,10 +1,10 @@
 #pragma once
 
-// Minimal, checked adapter to the official SKSE Menu Framework 2/3 C ABI.
-// Adapted on 2026-10-10 from QTR-Modding/SKSE-Menu-Framework-3-API,
-// commit 1dcb70179076aae4ab626f43c5baab2735ca5877. See SOURCE.txt and LICENSE.
-// Licensed under LGPL-2.1; the upstream 518 KiB ImGui wrapper is intentionally
-// reduced to these stable C exports, with null checks added before registration.
+
+
+
+
+
 
 #ifndef NOMINMAX
 #define NOMINMAX
@@ -30,6 +30,9 @@ namespace Redsand::MenuFramework
 		using ComboFunction = bool (*)(const char*, int*, const char*, int);
 		using SameLineFunction = void (*)(float, float);
 		using SetNextItemWidthFunction = void (*)(float);
+		using ColorEdit3Function = bool (*)(const char*, float*, int);
+		using CollapsingHeaderFunction = bool (*)(const char*, int);
+		using BeginDisabledFunction = void (*)(bool);
 
 		AddSectionItemFunction AddSectionItem = nullptr;
 		CheckboxFunction Checkbox = nullptr;
@@ -48,10 +51,14 @@ namespace Redsand::MenuFramework
 		ComboFunction Combo = nullptr;
 		SameLineFunction SameLine = nullptr;
 		SetNextItemWidthFunction SetNextItemWidth = nullptr;
+		ColorEdit3Function ColorEdit3 = nullptr;
+		CollapsingHeaderFunction CollapsingHeader = nullptr;
+		BeginDisabledFunction BeginDisabled = nullptr;
+		VoidFunction EndDisabled = nullptr;
 
 		bool Load()
 		{
-			// Use the already loaded SKSE plugin, never search for or load a DLL.
+
 			const auto module = GetModuleHandleW(L"SKSEMenuFramework.dll");
 			if (!module) { return false; }
 			AddSectionItem = Resolve<AddSectionItemFunction>(module, "AddSectionItem");
@@ -71,6 +78,10 @@ namespace Redsand::MenuFramework
 			Combo = Resolve<ComboFunction>(module, "igCombo_Str");
 			SameLine = Resolve<SameLineFunction>(module, "igSameLine");
 			SetNextItemWidth = Resolve<SetNextItemWidthFunction>(module, "igSetNextItemWidth");
+			ColorEdit3 = Resolve<ColorEdit3Function>(module, "igColorEdit3");
+			CollapsingHeader = Resolve<CollapsingHeaderFunction>(module, "igCollapsingHeader_TreeNodeFlags");
+			BeginDisabled = Resolve<BeginDisabledFunction>(module, "igBeginDisabled");
+			EndDisabled = Resolve<VoidFunction>(module, "igEndDisabled");
 			return AddSectionItem && Checkbox && SliderFloat && SmallButton && TextUnformatted && Separator &&
 				BeginTabBar && EndTabBar && BeginTabItem && EndTabItem && IsItemHovered && PushTextWrapPos && PopTextWrapPos &&
 				Combo && SameLine && SetNextItemWidth;

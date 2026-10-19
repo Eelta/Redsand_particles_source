@@ -10,6 +10,7 @@
 #include <vector>
 
 #include "../source/RedsandBowSimulation.h"
+#include "../source/RedsandSettings.h"
 #include "../source/RedsandBowStreamBudget.h"
 
 using namespace std::literals;
@@ -138,6 +139,7 @@ struct Stream
 	Pointer<RE::NiParticleSystem> system;
 	RE::NiAVObject* rendererRoot = nullptr;
 	RE::NiColorA color{ 0.8f, 0.2f, 0.1f, 1.f };
+	RE::NiColorA rendererColor{ 0.f, 0.f, 0.f, 0.f };
 	Redsand::Bow::Simulation simulation;
 	std::string meshPath = "renderer-fixture.nif";
 	float age = 0.f, rendererStartAge = 0.f, rendererBrightness = -1.f;
@@ -552,6 +554,22 @@ void hiddenEffectRootRecoversOnlyForItsLiveParticles()
 		"pending renderer revealed a root before submitting valid particle storage");
 }
 
+void liveColorRestoresInheritedTint()
+{
+	Fixture fixture;
+	fixture.Ready();
+	check(PrepareRenderer(fixture.stream) == RendererStatus::Ready, "initial bow renderer unavailable");
+	const auto inherited = fixture.stream.color;
+	auto config = RedsandSettings::Get();
+	auto& color = config.colors[static_cast<unsigned>(RedsandSettings::ColorTarget::Bow)];
+	color.custom = true; color.rgb = { .15f, .85f, .35f };
+	RedsandSettings::Set(config);
+	check(PrepareRenderer(fixture.stream) == RendererStatus::Ready && fixture.stream.rendererColor.green == .85f, "live bow RGB was not applied");
+	check(fixture.stream.color.red == inherited.red && fixture.stream.color.green == inherited.green, "custom RGB destroyed inherited bow color");
+	color.custom = false; RedsandSettings::Set(config);
+	check(PrepareRenderer(fixture.stream) == RendererStatus::Ready && fixture.stream.rendererColor.red == inherited.red, "bow tint did not restore after disabling RGB");
+}
+
 int main() try
 {
 	delayedResources();
@@ -562,6 +580,7 @@ int main() try
 	transientNativeResourcesWaitWithoutRestartingTheirClone();
 	diagnosticRateAndDisabledWork();
 	hiddenEffectRootRecoversOnlyForItsLiveParticles();
+	liveColorRestoresInheritedTint();
 	std::cout << "PASS: production renderer loading, isolated failure, scene graph replacement and live brightness\n";
 }
 catch (const std::exception& error)

@@ -657,7 +657,7 @@ def inspect_sources() -> None:
                     print(" gravity", index, gravity_fields(doc, index, system.index))
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description=__doc__)
+    parser = argparse.ArgumentParser(description=None)
     parser.add_argument("--inspect", action="store_true", help="Report source NIF fields without writing assets")
     args = parser.parse_args()
     if args.inspect:

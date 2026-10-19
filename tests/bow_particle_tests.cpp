@@ -543,6 +543,13 @@ void vanillaCrossbowTrajectory()
 
 int main() try
 {
+	{
+		Simulation standard(19), expanded(19);
+		standard.Ring({}, { 0.f, 1.f, 0.f }, 2.f, 1.f);
+		expanded.Ring({}, { 0.f, 1.f, 0.f }, 8.f, 1.f);
+		check(expanded.Particles().size() == standard.Particles().size() * 4 && expanded.Particles().size() <= Simulation::capacity,
+			"expanded bow density was silently clamped to the old limit");
+	}
 	chargeAndCancel();
 	sustainedCloud();
 	chargeDetection();

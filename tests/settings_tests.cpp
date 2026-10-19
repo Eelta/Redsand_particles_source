@@ -1,6 +1,7 @@
 #include "../source/RedsandSettings.h"
 
 #include <atomic>
+#include <barrier>
 #include <chrono>
 #include <filesystem>
 #include <fstream>
@@ -207,6 +208,7 @@ namespace
 		expected.swordPlayer = false;
 		expected.swordNPC = false;
 		expected.swordTip = true;
+		expected.swordKeepPrecisionTrail = true;
 		expected.swordBrightness = 2.5f;
 		expected.swordDensity = 0.75f;
 		expected.swordSpread = 1.25f;
@@ -249,6 +251,53 @@ namespace
 		RedsandSettings::FlushPendingSave();
 		RedsandSettings::Load(path);
 		Check(RedsandSettings::Get().swordDensity == 1.75f, "the final dragged slider value was not persisted");
+	}
+
+	void PrecisionTrailIsOptInAndPersists(const Workspace& workspace)
+	{
+		const auto path = workspace.path / "precision-ribbon.ini";
+		Write(path, "[SwordParticles]\nTip=true\n");
+		RedsandSettings::Load(path);
+		Check(RedsandSettings::Get().swordKeepPrecisionTrail, "approved dual trails should be enabled by default");
+		Write(path, "[SwordParticles]\nKeepPrecisionTrail=ON\n[BowParticles]\nTrails=false\n");
+		RedsandSettings::Load(path);
+		Check(RedsandSettings::Get().swordKeepPrecisionTrail && !RedsandSettings::Get().bowTrails,
+			"native melee and bow trail controls were not independent");
+		auto config = RedsandSettings::Get();
+		config.swordKeepPrecisionTrail = false;
+		RedsandSettings::Set(config);
+		Check(!RedsandSettings::Get().swordKeepPrecisionTrail, "native ribbon did not disable immediately");
+		RedsandSettings::FlushPendingSave();
+		Check(Read(path).find("KeepPrecisionTrail=false") != std::string::npos, "native ribbon preference did not save");
+		Write(path, "[SwordParticles]\nKeepPrecisionTrail=invalid\n");
+		RedsandSettings::Load(path);
+		Check(RedsandSettings::Get().swordKeepPrecisionTrail, "invalid native ribbon value lost the approved default");
+	}
+
+	void ImpactLevelsAndSwitchesPreserveExistingSettings(const Workspace& workspace)
+	{
+		const auto path = workspace.path / "impact.ini";
+		Write(path, "[Menu]\nLanguage=Chinese\n[SwordParticles]\nKeepPrecisionTrail=true\nBrightness=2.5\n"
+			"[BowParticles]\nDensity=0.75\n[ImpactVFX]\nEnabled=false\nHit=false\nSlash=false\nBlock=true\nBrightnessLevel=3\nDensityLevel=0\nSizeLevel=1\n");
+		RedsandSettings::Load(path);
+		auto config = RedsandSettings::Get();
+		Check(!config.impactEnabled && !config.impactHit && !config.impactSlash && config.impactBlock &&
+			config.impactBrightness == 12.f && config.impactDensity == .1f && config.impactSize == .5f,
+			"impact settings failed to load");
+		Check(config.swordKeepPrecisionTrail && config.swordBrightness == 2.5f && config.bowDensity == 0.75f &&
+			config.language == RedsandSettings::Language::Chinese, "impact migration changed prior settings");
+		Check(config.preserveValhallaRing,"approved preserved ring should be the default");
+		config.preserveValhallaRing=true;
+		config.impactEnabled = true; config.impactBrightness = 1.37f; config.impactDensity = 2.85f; config.impactSize = .73f;
+		RedsandSettings::Set(config); RedsandSettings::FlushPendingSave(); RedsandSettings::Load(path);
+		Check(RedsandSettings::Get() == config, "impact settings did not persist independently");
+		Write(path, "[ImpactVFX]\nBrightnessLevel=nan\nDensityLevel=1.5\nSizeLevel=junk\n");
+		RedsandSettings::Load(path);
+		Check(RedsandSettings::Get().impactBrightness == 1 && RedsandSettings::Get().impactDensity == 1 &&
+			RedsandSettings::Get().impactSize == 1, "invalid levels did not retain preset defaults");
+		config = RedsandSettings::Get(); config.impactBrightness = 99; config.impactDensity = -8;
+		RedsandSettings::Set(config);
+		Check(RedsandSettings::Get().impactBrightness == 20 && RedsandSettings::Get().impactDensity == 0, "levels were not clamped");
 	}
 
 	void FailedSaveCanRecoverWithoutAnotherMenuChange(const Workspace& workspace)
@@ -307,13 +356,72 @@ namespace
 		RedsandSettings::FlushPendingSave();
 		RedsandSettings::Load(workspace.path / "concurrent.ini");
 		Check(RedsandSettings::Get() == second, "the last concurrent publication was not saved");
+		std::barrier phase(2);
+		std::atomic_bool stale = false;
+		std::thread reader([&] {
+			for (unsigned i = 0; i < 2000; ++i) {
+				phase.arrive_and_wait();
+				if (RedsandSettings::Get() != (i % 2 == 0 ? first : second)) { stale.store(true); }
+				phase.arrive_and_wait();
+			}
+		});
+		for (unsigned i = 0; i < 2000; ++i) {
+			RedsandSettings::Set(i % 2 == 0 ? first : second);
+			phase.arrive_and_wait();
+			phase.arrive_and_wait();
+		}
+		reader.join();
+		Check(!stale.load(), "a published menu change left a reader's cached settings stale");
 	}
+}
+
+void RGBAndCutLengthRoundTrip(const Workspace& workspace)
+{
+	using namespace RedsandSettings;
+	const auto path = workspace.path / "rgb.ini";
+	Write(path, "[ImpactVFX]\nCutLength=3.25\n[Color.Cut]\nEnabled=true\nR=0.15\nG=0.8\nB=0.4\n[Color.Melee]\nEnabled=true\nR=0\nG=0\nB=0\n");
+	Load(path);
+	auto config = Get();
+	Check(config.cutLength == 3.25f, "cut length was not loaded");
+	Check(config.colors[4].rgb == std::array<float, 3>{ .15f, .8f, .4f }, "cut RGB was not loaded");
+	Check(config.colors[0].custom && config.colors[0].rgb == std::array<float, 3>{ 0.f, 0.f, 0.f }, "black must be a valid custom RGB");
+	config.cutLength = 100.f;
+	config.colors[2].rgb = { -1.f, 8.f, std::numeric_limits<float>::quiet_NaN() };
+	Set(config); FlushPendingSave();
+	const auto saved = Get();
+	Check(saved.cutLength == maxCutLength && saved.colors[2].rgb == std::array<float, 3>{ 0.f, 1.f, defaultColors[2].rgb[2] }, "RGB/length normalization failed");
+	Load(path); Check(Get() == saved, "RGB/length persistence changed values");
+	config = Get(); config.cutLength = std::numeric_limits<float>::quiet_NaN(); config.colors[0].custom = false;
+	Set(config); Check(Get().cutLength == 1.f && !Get().colors[0].custom, "disable custom or invalid length fallback failed");
+}
+
+void RandomSlashPersistsAndDefaultsOff(const Workspace& workspace)
+{
+    using namespace RedsandSettings;
+    const auto path = workspace.path / "random-slash.ini";
+    Write(path, "[ImpactVFX]\nRandomSlashColor=true\nRandomSlashValues=true\nRandomSlashRange=0.25\nBrightness=3.5\n");
+    Load(path);
+    Check(Get().slashRandomColor && Get().impactBrightness == 3.5f, "random slash INI was not loaded");
+    Check(Get().slashRandomValues && Get().slashRandomRange == .25f, "numeric random toggle/range was not loaded");
+    auto saved = Get(); saved.cutLength = 2.25f; Set(saved); FlushPendingSave();
+    Check(Read(path).find("RandomSlashColor=true") != std::string::npos, "random slash was not serialized");
+    Load(path); Check(Get() == saved, "random slash did not round trip");
+    ResetDefaults(); FlushPendingSave(); Load(path);
+    Check(!Get().slashRandomColor && Get().impactBrightness == 1.f, "random slash defaults must be off");
+    Check(!Get().slashRandomValues && Get().slashRandomRange == .5f, "numeric random defaults must be off with 50% range");
+    auto invalid = Get(); invalid.slashRandomRange = 9.f; Set(invalid);
+    Check(Get().slashRandomRange == 1.f, "numeric range maximum was not clamped");
+    invalid.slashRandomRange = -1.f; Set(invalid);
+    Check(Get().slashRandomRange == 0.f, "numeric range minimum was not clamped");
+    invalid.slashRandomRange = std::numeric_limits<float>::quiet_NaN(); Set(invalid);
+    Check(Get().slashRandomRange == .5f, "invalid numeric range did not restore 50%");
 }
 
 int main()
 {
 	try {
 		const Workspace workspace;
+        RandomSlashPersistsAndDefaultsOff(workspace);
 		ExistingBowIniRemainsCompatible(workspace);
 		SwordDefaultsAndSavedOverridesRemainDistinct(workspace);
 		OldIniPreservesSavedOptionsAndIgnoresRemovedStaffSection(workspace);
@@ -321,9 +429,35 @@ int main()
 		IniInputCannotPublishInvalidMultipliers(workspace);
 		DiagnosticLoggingDefaultsOffAndTogglesImmediately(workspace);
 		ImmediatePublicationAndPersistenceRoundTrip(workspace);
+		PrecisionTrailIsOptInAndPersists(workspace);
+		ImpactLevelsAndSwitchesPreserveExistingSettings(workspace);
 		ControlReleaseFlushesTheLastSliderValue(workspace);
 		FailedSaveCanRecoverWithoutAnotherMenuChange(workspace);
 		GameAndMenuThreadsObserveCompleteSnapshots(workspace);
+		RGBAndCutLengthRoundTrip(workspace);
+		const auto travelPath = workspace.path / "slash-travel.ini";
+		Write(travelPath, "[ImpactVFX]\nSlashDistance=3.25\nSlashSpread=0.35\nSlashDensity=0.24\nCutLength=1.7\nBrightness=4.5\nDensity=2.85\nSize=0.55\n");
+		RedsandSettings::Load(travelPath);
+		auto travel = RedsandSettings::Get();
+		Check(travel.slashSpread == .35f && travel.slashDensity == .24f, "independent slash spread/count did not load");
+		Check(travel.slashDistance == 3.25f && travel.cutLength == 1.7f && travel.impactBrightness == 4.5f &&
+			travel.impactDensity == 2.85f && travel.impactSize == .55f, "slash travel overwrote independent controls");
+		travel.slashDistance = 40.f; RedsandSettings::Set(travel); RedsandSettings::FlushPendingSave(); RedsandSettings::Load(travelPath);
+		Check(RedsandSettings::Get().slashDistance == RedsandSettings::maxSlashDistance, "slash travel upper range did not persist");
+		Check(RedsandSettings::Get().slashSpread == .35f && RedsandSettings::Get().slashDensity == .24f, "independent slash spread/count did not persist");
+		travel.slashDistance = -1.f; RedsandSettings::Set(travel);
+		Check(RedsandSettings::Get().slashDistance == RedsandSettings::minSlashDistance, "slash travel lower bound failed");
+		travel.slashDistance = std::numeric_limits<float>::quiet_NaN(); RedsandSettings::Set(travel);
+		Check(RedsandSettings::Get().slashDistance == RedsandSettings::defaultSlashDistance, "invalid slash travel did not restore default");
+		Write(travelPath, "[ImpactVFX]\nSlashDensity=10\n");
+		RedsandSettings::Load(travelPath);
+		Check(RedsandSettings::Get().slashDensity == 1.f && RedsandSettings::maxSlashDensity == 1.f, "rebased slash quantity upper limit did not normalize to one");
+		travel = RedsandSettings::Get(); travel.slashDensity = -1.f; RedsandSettings::Set(travel);
+		Check(RedsandSettings::Get().slashDensity == 0.f, "rebased slash quantity lower bound failed");
+		travel.slashDensity = std::numeric_limits<float>::quiet_NaN(); RedsandSettings::Set(travel);
+		Check(RedsandSettings::Get().slashDensity == 1.f, "invalid rebased slash quantity did not restore unit default");
+		travel.slashDensity = 3.f; RedsandSettings::Set(travel); RedsandSettings::FlushPendingSave(); RedsandSettings::Load(travelPath);
+		Check(RedsandSettings::Get().slashDensity == 1.f, "runtime rebased slash quantity upper bound did not persist");
 		std::cout << "Runtime settings, persistence and thread snapshot checks passed\n";
 		return 0;
 	} catch (const std::exception& exception) {

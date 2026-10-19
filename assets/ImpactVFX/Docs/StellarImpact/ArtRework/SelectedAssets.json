@@ -1,0 +1,110 @@
+{
+  "collections": [
+    {
+      "author": "tktk (Effekseer contributed collection)",
+      "url": "https://effekseer.github.io/en/contributes/tktk02/index.html",
+      "license": "CC0-1.0",
+      "license_url": "https://effekseer.github.io/en/contribute.html",
+      "zip_sha256": "97b0ed533ef77031826269bd4b43da3aa3299f2d5440f76ca6ada8b6494438ac"
+    },
+    {
+      "author": "Raffaele Picca",
+      "url": "https://github.com/RPicster/Godot-particle-and-vfx-textures",
+      "license": "CC0-1.0",
+      "zip_sha256": "ba2c321c25dcf3dcab25ba3769ce700e498d90daf481868acca935a3ae48b5f7"
+    }
+  ],
+  "textures": [
+    {
+      "file": "Textures/StellarImpact/ArtRework/Needle.dds",
+      "source": "sources/effekseer-tktk02/tktk02/Parts/Line6.png",
+      "source_sha256": "7c68671fe7168c903122795deb3eabedd89d38ce966bd8a61e947b7da1d36c86",
+      "sha256": "b4f71bdb357b84d17ba1feb4d760e7273240e68289ee36c741fc3bdbb751c9b8",
+      "dimensions": [
+        64,
+        128
+      ],
+      "license": "CC0-1.0",
+      "conversion": "Unmodified RGBA top mip; BGRA8 DDS with alpha-aware mip chain",
+      "pixel_exact": true
+    },
+    {
+      "file": "Textures/StellarImpact/ArtRework/Razor.dds",
+      "source": "sources/effekseer-tktk02/tktk02/Parts/Line2.png",
+      "source_sha256": "979c52fe0dbaaa71fe1e5e5499092865d3df155de341c8b82d1527cdaa303545",
+      "sha256": "ae8824e5cad519cc97a89483070a73ac94016e59bc03d5aca6c0938324b15f8f",
+      "dimensions": [
+        128,
+        64
+      ],
+      "license": "CC0-1.0",
+      "conversion": "Unmodified RGBA top mip; BGRA8 DDS with alpha-aware mip chain",
+      "pixel_exact": true
+    },
+    {
+      "file": "Textures/StellarImpact/ArtRework/Silk.dds",
+      "source": "sources/effekseer-tktk02/tktk02/Parts/Line5.png",
+      "source_sha256": "3b5e3b34ff09972087f200d0a35d8383791c6fe89572cb78ff9e5128c493fdaf",
+      "sha256": "246ec1f2a2db48427ee00ea263a0d7779dc4c6c380af72c56b25ce73c491fab9",
+      "dimensions": [
+        512,
+        512
+      ],
+      "license": "CC0-1.0",
+      "conversion": "Unmodified RGBA top mip; BGRA8 DDS with alpha-aware mip chain",
+      "pixel_exact": true
+    },
+    {
+      "file": "Textures/StellarImpact/ArtRework/Ember.dds",
+      "source": "sources/effekseer-tktk02/tktk02/Parts/Spark002.png",
+      "source_sha256": "cd9b7856cf9fc453173e11bdf204e08c180c374662065b07f12225891a3f52f7",
+      "sha256": "35653f62e61c57ace0a1f660059bd7a9db32ed0007e74ab35ef7899d04ed953f",
+      "dimensions": [
+        128,
+        128
+      ],
+      "license": "CC0-1.0",
+      "conversion": "Unmodified RGBA top mip; BGRA8 DDS with alpha-aware mip chain",
+      "pixel_exact": true
+    },
+    {
+      "file": "Textures/StellarImpact/ArtRework/ContactCorona.dds",
+      "source": "sources/picster/Godot-particle-and-vfx-textures-main/textures/1024/alpha/effect_3.png",
+      "source_sha256": "be6954309c2f238957ce221533c3f5e647a45d5250d830286f00175489a0699e",
+      "sha256": "f115ae399a0472c6759d954276d76c2a490cfad5f670ae7377d4237e6172812d",
+      "dimensions": [
+        1024,
+        1024
+      ],
+      "license": "CC0-1.0",
+      "conversion": "Unmodified RGBA top mip; BGRA8 DDS with alpha-aware mip chain",
+      "pixel_exact": true
+    },
+    {
+      "file": "Textures/StellarImpact/ArtRework/CoronaRays.dds",
+      "source": "sources/effekseer-tktk02/tktk02/Parts/Sonic_wave_ring005.png",
+      "source_sha256": "54cf0e55763611985f25de546cb2fcdfd63ff3a3d269b744882f9adfff2e1a42",
+      "sha256": "b4625f76f737e45a2c07c64f49de98233da8c2269997e5b4ecb666360135f9fe",
+      "dimensions": [
+        256,
+        128
+      ],
+      "license": "CC0-1.0",
+      "conversion": "Unmodified RGBA top mip; BGRA8 DDS with alpha-aware mip chain",
+      "pixel_exact": true
+    },
+    {
+      "file": "Textures/StellarImpact/ArtRework/ContactLine.dds",
+      "source": "sources/effekseer-tktk02/tktk02/Parts/ShockWave3.png",
+      "source_sha256": "0654fcc1263652b18f119bf465e6b899d2469e3388097361120e8a452a23359b",
+      "sha256": "b90e639f89eded19a04026a715fb39584a2fadcd97541b08f5d3fb0b71b44554",
+      "dimensions": [
+        128,
+        64
+      ],
+      "license": "CC0-1.0",
+      "conversion": "Unmodified RGBA top mip; BGRA8 DDS with alpha-aware mip chain",
+      "pixel_exact": true
+    }
+  ]
+}

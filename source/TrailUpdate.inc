@@ -1,4 +1,4 @@
-if (!redsandChecked && trailParticle && trailParticle->particleObject) {
+if (!redsandNativeOnly && !redsandChecked && trailParticle && trailParticle->particleObject) {
 			CacheRedsandEmissionMeshes(trailParticle->particleObject.get());
 			RE::BSVisit::TraverseScenegraphGeometries(trailParticle->particleObject.get(), [&](RE::BSGeometry* geometry) {
 				if (geometry->name == "RedsandParticles_Drain_v1"sv) {

@@ -1,4 +1,4 @@
-const bool uniqueParticleMaterial = !redsandLegacyTrail && a_geometry->name == "RedsandParticles_Drain_v1"sv;
+const bool uniqueParticleMaterial = redsandNativeOnly || (!redsandLegacyTrail && a_geometry->name == "RedsandParticles_Drain_v1"sv);
 					LogRedsandParticles(a_geometry, "material-source"sv);
 					effectShader->SetMaterial(newMaterial, uniqueParticleMaterial);
 					redsandMaterialCopied = true;

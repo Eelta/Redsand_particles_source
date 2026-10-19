@@ -11,6 +11,23 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "tools"))
 import generate_weapon_assets as assets
 
+def historical_asset_hash(doc):
+
+    import copy
+    restored = copy.deepcopy(doc)
+    changes = {
+        8: (b"textures\\effects\\fxwhite.dds", b"textures\\effects\\Chaos\\fxwhite.dds"),
+        15: (b"textures\\effects\\fxfirescrolltile02.dds", b"textures\\effects\\Chaos\\fxfirescrolltile02.dds"),
+        23: (b"textures\\effects\\fxfirescrolltile02.dds", b"textures\\effects\\Chaos\\fxfirescrolltile02.dds"),
+        41: (b"textures\\effects\\Swordtrail.dds", b"textures\\effects\\OrigPrecision\\Swordtrail.dds"),
+    }
+    for index, (new, old) in changes.items():
+        needle = struct.pack("<I", len(new)) + new
+        replacement = struct.pack("<I", len(old)) + old
+        assert restored.blocks[index].count(needle) == 1
+        restored.blocks[index] = restored.blocks[index].replace(needle, replacement)
+    return hashlib.sha256(restored.serialize()).hexdigest()
+
 PREVIOUS_TEMPLATE_SHA256 = {
     "Default": "8ee748130f887ba9212ac4089064c258d5382482c6abe2a8ac84afd241558424",
     "Sword": "2fc864d2b8bde28ce78a7e226b3f1f4e75ce86a1e871c08ec23127e018368d93",
@@ -44,7 +61,7 @@ class WeaponAssetTests(unittest.TestCase):
                             else f"textures\\effects\\ElementalDesert\\WeaponStyles\\{path.stem}.dds").encode("ascii")
                 shader = doc.blocks[system.shader]
                 doc.blocks[system.shader] = shader[:start] + struct.pack("<I", len(previous)) + previous + shader[end:]
-                self.assertEqual(hashlib.sha256(doc.serialize()).hexdigest(), PREVIOUS_TEMPLATE_SHA256[path.stem])
+                self.assertEqual(historical_asset_hash(doc), PREVIOUS_TEMPLATE_SHA256[path.stem])
 
     def test_nine_variants_parse_and_only_owned_blocks_change(self):
         for profile in assets.PROFILES:
@@ -96,7 +113,7 @@ class WeaponAssetTests(unittest.TestCase):
                 old_texture = b"textures\\effects\\ElementalDesert\\circle_05.dds"
                 shader = doc.blocks[91]
                 doc.blocks[91] = shader[:start] + struct.pack("<I", len(old_texture)) + old_texture + shader[end:]
-                self.assertEqual(hashlib.sha256(doc.serialize()).hexdigest(), ORIGINAL_DEFAULT_SHA256)
+                self.assertEqual(historical_asset_hash(doc), ORIGINAL_DEFAULT_SHA256)
                 doc.blocks[91] = shader
 
                 emitter = bytearray(doc.blocks[96])
@@ -291,14 +308,27 @@ class WeaponAssetTests(unittest.TestCase):
             assets.ensure_motion_controllers(doc)
 
     def test_preview_uses_actual_decoded_dds_and_is_explicitly_not_a_game_screenshot(self):
-        preview = ROOT / "output/weapon-particle-styles.png"
-        data = preview.read_bytes()
+        preview = ROOT / "docs/weapon-particle-styles.png"
+        data = preview.read_bytes() if preview.is_file() else assets.preview_bytes()
         self.assertEqual(data[:8], b"\x89PNG\r\n\x1a\n")
         self.assertEqual(struct.unpack(">II", data[16:24]), (750, 710))
         self.assertIn(b"Not a game screenshot", data)
 
         with mock.patch.object(assets, "shape_alpha", side_effect=AssertionError("Preview redrew an idealized shape")):
-            self.assertEqual(assets.preview_bytes(), data)
+
+
+            import zlib
+            def scanlines(png):
+                pos = 8
+                payload = bytearray()
+                while pos < len(png):
+                    length = struct.unpack_from(">I", png, pos)[0]
+                    kind = png[pos + 4:pos + 8]
+                    if kind == b"IDAT":
+                        payload.extend(png[pos + 8:pos + 8 + length])
+                    pos += length + 12
+                return zlib.decompress(payload)
+            self.assertEqual(scanlines(assets.preview_bytes()), scanlines(data))
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)

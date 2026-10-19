@@ -26,6 +26,12 @@ namespace RedsandLog
 
 namespace RE
 {
+	struct BSResourceNiBinaryStream
+	{
+		inline static bool available = true;
+		explicit BSResourceNiBinaryStream(const std::string&) {}
+		bool good() const { return available; }
+	};
 	struct NiPoint3
 	{
 		float x = 0, y = 0, z = 0;
@@ -472,6 +478,7 @@ namespace
 		RedsandSettings::Config redsandConfig;
 		Profile redsandWeaponProfile = Profile::Default;
 		bool redsandLegacyTrail = false, redsandActorIsPlayer = false, redsandScopeAllowed = false;
+		bool redsandNativeOnly = false, redsandParticleSelected = false;
 		std::optional<RE::NiColorA> baseColorOverride;
 		std::string Select(const RedsandSettings::Config& config, RE::Actor* actor, RE::TESObjectWEAP* weapon,
 			std::string_view requested, std::string_view installedRibbon)
@@ -523,6 +530,8 @@ namespace
 							Check(fixture.redsandScopeAllowed == allowed && fixture.redsandLegacyTrail != allowed && fixture.redsandActorIsPlayer == player,
 								"constructor did not snapshot the player/NPC scope correctly");
 							Check(IsParticleMesh(selected) == allowed, "direct/TOML particle override bypassed constructor scope before Spawn");
+							if (allowed) { Check(fixture.baseColorOverride && fixture.baseColorOverride->blue == .650f &&
+								fixture.baseColorOverride->red == .025f, "unenchanted primary lost its original blue default"); }
 							if (!allowed) {
 								Check(selected == customRibbon, "excluded scope did not retain the installed custom ribbon");
 								Check(fixture.Select(config, &actor, &weapon, requested, own) == hardRibbon, "own installed fallback reintroduced excluded particles");
@@ -544,6 +553,25 @@ namespace
 			weapon.type = RE::WEAPON_TYPE::kOneHandSword;
 		}
 		ScopeFixture missingActor;
+		RE::Actor nativeActor;
+		ScopeFixture native;
+		native.redsandNativeOnly = true;
+		for (const auto mesh : ownMeshes) {
+			Check(native.Select({}, &nativeActor, &weapon, mesh, customRibbon) == customRibbon &&
+				native.redsandLegacyTrail && !native.redsandParticleSelected && !native.redsandScopeAllowed,
+				"native-only companion selected a Redsand particle mesh");
+			Check(!native.baseColorOverride, "Redsand blue fallback recolored the player's native ribbon");
+		}
+		Check(native.Select({}, &nativeActor, &weapon, "", "") == hardRibbon,
+			"native-only trail did not recover an empty default path");
+		const std::string ledRibbon = "WeaponTrails/AttackTrailMagic_FireSword.nif";
+		RE::BSResourceNiBinaryStream::available = true;
+		Check(native.Select({}, &nativeActor, &weapon, ledRibbon, customRibbon) == ledRibbon,
+			"installed player-selected LED ribbon was overridden");
+		RE::BSResourceNiBinaryStream::available = false;
+		Check(native.Select({}, &nativeActor, &weapon, ledRibbon, customRibbon) == customRibbon,
+			"missing LED mesh did not use the installed ribbon fallback");
+		RE::BSResourceNiBinaryStream::available = true;
 		Check(missingActor.Select({}, nullptr, &weapon, own, own) == hardRibbon && !missingActor.redsandScopeAllowed,
 			"an unresolved actor emitted particles before its scope could be checked");
 		constexpr auto unrelated = "Effects/WeaponTrails/ElementalDesertOther/Fire.nif";
