@@ -12,8 +12,12 @@ if ($workPath -eq [IO.Path]::GetPathRoot($WorkRoot).TrimEnd('\') -or $workPath -
     throw 'The build workspace must not contain the source directory or a drive root.'
 }
 $output = Join-Path $sourceRoot 'output'
-if ($output -eq $workPath -or $output.StartsWith($workPath + '\', [StringComparison]::OrdinalIgnoreCase)) {
-    throw 'The build workspace must not contain the output directory.'
+$cacheRoot = [IO.Path]::GetFullPath((Join-Path $sourceRoot 'cache'))
+$buildData = Join-Path $cacheRoot 'BuildData'
+foreach ($retainedPath in @($output, $buildData)) {
+    if ($retainedPath -eq $workPath -or $retainedPath.StartsWith($workPath + '\', [StringComparison]::OrdinalIgnoreCase)) {
+        throw 'The build workspace must not contain the output or retained build data directory.'
+    }
 }
 $workspaceMarker = Join-Path $WorkRoot '.redsand-workspace'
 if ((Test-Path -LiteralPath $WorkRoot) -and !(Test-Path -LiteralPath $workspaceMarker) -and (Get-ChildItem -LiteralPath $WorkRoot -Force | Select-Object -First 1)) {
@@ -27,6 +31,12 @@ if (Test-Path -LiteralPath $workspaceMarker) {
     [IO.File]::WriteAllText($workspaceMarker, $sourceRoot, $utf8)
 }
 [IO.Directory]::CreateDirectory($output) | Out-Null
+[IO.Directory]::CreateDirectory($buildData) | Out-Null
+$cacheMarker = Join-Path $cacheRoot '.redsand-cache'
+if ((Test-Path -LiteralPath $cacheMarker) -and [IO.File]::ReadAllText($cacheMarker).Trim() -ne $sourceRoot) {
+    throw 'The cache belongs to a different source directory.'
+}
+[IO.File]::WriteAllText($cacheMarker, $sourceRoot, $utf8)
 
 function Run([string]$Program, [string[]]$Arguments) {
     & $Program @Arguments
@@ -225,8 +235,8 @@ try {
     $cpp = Replace-One $cpp 'TrailDefinition& a_outTrailDefinition) const' 'TrailDefinition& a_outTrailDefinition, bool a_ribbonColor) const'
     $header = Replace-One $header 'TrailDefinition& a_outTrailDefinition) const' 'TrailDefinition& a_outTrailDefinition, bool a_ribbonColor = false) const'
     $anchor = 'bool AttackTrail::GetTrailDefinition('
-    $cpp = Replace-One $cpp $anchor ((Text (Join-Path $PSScriptRoot 'source/ParticleDrain.cpp.inc')) + (Text (Join-Path $PSScriptRoot 'source/ParticleDiagnostics.cpp.inc')) + (Text (Join-Path $PSScriptRoot 'source/SwordRuntime.inc')) + $anchor)
-    $header = Replace-One $header '#include "Settings.h"' "#include `"Settings.h`"`n#include `"RedsandDrainState.h`"`n#include `"RedsandSettings.h`"`n#include `"RedsandMaterialColor.h`"`n#include `"RedsandLog.h`"`n#include `"RedsandMeleeStyle.h`"`n#include `"RedsandEmissionTuning.h`"`n#include `"RE/N/NiPSysGravityModifier.h`"`n#include `"RE/N/NiFloatInterpolator.h`""
+    $cpp = Replace-One $cpp $anchor ((Text (Join-Path $PSScriptRoot 'source/SwingTrailRuntime.inc')) + (Text (Join-Path $PSScriptRoot 'source/ParticleDrain.cpp.inc')) + (Text (Join-Path $PSScriptRoot 'source/ParticleDiagnostics.cpp.inc')) + (Text (Join-Path $PSScriptRoot 'source/SwordRuntime.inc')) + $anchor)
+    $header = Replace-One $header '#include "Settings.h"' "#include `"Settings.h`"`n#include `"RedsandDrainState.h`"`n#include `"RedsandSwingTrail.h`"`n#include `"RedsandSettings.h`"`n#include `"RedsandMaterialColor.h`"`n#include `"RedsandLog.h`"`n#include `"RedsandMeleeStyle.h`"`n#include `"RedsandEnchantmentProfiles.h`"`n#include `"RedsandEmissionTuning.h`"`n#include `"RE/N/NiPSysGravityModifier.h`"`n#include `"RE/N/NiFloatInterpolator.h`""
     $header = Replace-One $header "private:`n" ("private:`n" + (Text (Join-Path $PSScriptRoot 'source/TrailMembers.inc')))
     Save $cppPath $cpp
     Save $headerPath $header
@@ -271,11 +281,11 @@ try {
     $pending = Replace-One $pending "void PendingHit::Run()`n{" "void PendingHit::Run()`n{`n`tRedsandSlashRandom::AttackScope randomSlashAttack(attackCollision ? attackCollision->redsandSlashSeed : 0u);"
     Save $pendingPath $pending
     $nativeFiles = @(
-        'RedsandDrainState.h', 'RedsandHavokLayout.h',
+        'RedsandSwingTrail.h', 'RedsandDrainState.h', 'RedsandHavokLayout.h',
         'RedsandBowParticles.h', 'RedsandBowParticles.cpp', 'RedsandBowSimulation.h',
         'RedsandBowChargeState.h', 'RedsandBowEventState.h', 'RedsandBowStreamBudget.h',
         'BowGraphSnapshot.inc', 'BowArrowProcessing.inc', 'BowRenderer.inc', 'BowMotionDiagnostics.inc', 'RedsandMotionTrace.h',
-        'RedsandSettings.h', 'RedsandSettings.cpp', 'RedsandLog.h', 'RedsandLog.cpp', 'RedsandMenu.h', 'RedsandMenu.cpp',
+        'RedsandEnchantmentProfiles.h', 'RedsandEnchantmentProfiles.cpp', 'RedsandSettings.h', 'RedsandSettings.cpp', 'RedsandLog.h', 'RedsandLog.cpp', 'RedsandMenu.h', 'RedsandMenu.cpp',
         'RedsandBlockLightning.h', 'RedsandBlockLightning.cpp', 'RedsandBlockLightningPolicy.h', 'RedsandImpactVFX.h', 'RedsandImpactVFX.cpp', 'RedsandImpactRouting.h', 'RedsandImpactManifest.h', 'RedsandSlashFrame.h',
         'RedsandAppearancePolicy.h', 'RedsandLiveAppearance.cpp', 'RedsandSlashRandom.h', 'RedsandMaterialColor.h', 'RedsandUpdateScope.h', 'SlashEmitterControls.inc',
         'RedsandWeaponProfiles.h', 'RedsandWeaponProfiles.cpp', 'RedsandMeleeStyle.h', 'RedsandEmissionTuning.h'
@@ -337,6 +347,7 @@ try {
         foreach ($asset in Get-ChildItem -LiteralPath $impactAssets -Recurse -File) {
             $relative = $asset.FullName.Substring($impactAssets.Length + 1)
             if ($relative -match '^Docs[\\/]') { continue }
+            if ($relative -match '^Meshes[\\/]StellarImpact[\\/]Runtime[\\/]') { continue }
             if ($relative -notmatch '^(SKSE[\\/]Plugins[\\/]RedsandImpactVFX\.toml|Meshes[\\/]StellarImpact[\\/].+\.nif|Textures[\\/]StellarImpact[\\/].+\.dds)$') {
                 throw "Unexpected ImpactVFX module file: $relative"
             }
@@ -395,7 +406,17 @@ try {
         approvedAppearanceUnitBaseline=@{ brightness=10.0; density=10.0; cutLength=10.0; slashDistance=20.0; slashSpread=0.13; slashDensity=10.0 }
         slashSpreadRange=@(0.0,5.0)
         independentSlashDensityRange=@(0.0,1.0)
-        slashSparkDistanceDefault=1.0
+        slashSparkDistanceDefault=0.1
+        slashSparkDensityDefault=0.0
+        slashSparkSpreadDefault=0.0
+        impactDensityDefault=0.1
+        randomSlashColorDefault=$false
+        randomSlashValuesDefault=$false
+        independentEnchantmentProfiles=$true
+        enchantmentCategoryKeys=@('none','fire','frost','shock','green','purple','blue','red','bound','sun','unknown')
+        enchantmentCategoriesIndependentOfMain=$true
+        enchantmentCategoriesUseOriginalPriority=$true
+        redsandMode=@{ defaultEnabled=$true; replacesPrecisionRibbon=$true; perCategory=$true; arcFade='smooth-opacity-with-light-width-taper'; ribbonLifetime=0.2; particleLifetime=0.3; ribbonWidth=0.5; trailMomentum=0.1; lifetimeKeysRepresentHoldTime=$true; ribbonFadeOut=0.25; particleFadeOut=0.4; particleGravityDefault=0.3; gravityAcceleration=240.0; particleDrag=3.0; lifetimeAfterSwing=$true; maximumHold=0.24; curve='causal-shared-tangent-hermite'; zeroFrameLookahead=$true; smallConcentratedGrains=$true; maximumInstances=32; maximumParticlesPerInstance=4096; damageProjectile=$false }
         slashSparkDistanceRange=@(0.1,20.0)
         impactVFXBrightnessRange=@(0.0,20.0)
         impactVFXDensityRange=@(0.0,10.0)
@@ -406,6 +427,11 @@ try {
         impactVFXRequiresMIF=$false
         impactVFXIncludesSounds=$false
         impactVFXPresetCount=64
+        sharedImpactModels=$true
+        omittedLegacyImpactMeshes=640
+        distinctBlockStyles=5
+        redsandSharedCurveEvaluation=$true
+        redsandSharedDampingCoefficients=$true
         impactVFXNativeMeasuredSlash=1
         impactVFXModelRouteTypes=@('IPCT')
         impactVFXRoutePlugins=@('Skyrim.esm')
@@ -451,12 +477,14 @@ try {
         requiresPreviousRedsand=$false
         bowParticleEffects=@('chargeConvergence', 'releaseRing', 'worldSpaceArrowTrail')
     }
-    $manifestPath = Join-Path $output 'BUILD.json'
+    $manifestPath = Join-Path $buildData 'BUILD.json'
     Save $manifestPath ($provenance | ConvertTo-Json)
     & (Join-Path $PSScriptRoot 'tests/package_layout_tests.ps1') -StagePath $stage -AssetsPath (Join-Path $PSScriptRoot 'assets') -ManifestPath $manifestPath
     Add-Type -AssemblyName System.IO.Compression
     Add-Type -AssemblyName System.IO.Compression.FileSystem
-    $archive = Join-Path $output 'Redsand Particles.zip'
+    $runtimeOutput = Join-Path $buildData 'Runtime'
+    [IO.Directory]::CreateDirectory($runtimeOutput) | Out-Null
+    $archive = Join-Path $runtimeOutput 'Redsand Particles.zip'
     $pending = Join-Path $WorkRoot ('package-' + [guid]::NewGuid().ToString('N') + '.zip')
     $zip = [IO.Compression.ZipFile]::Open($pending, [IO.Compression.ZipArchiveMode]::Create)
     try {
@@ -468,11 +496,18 @@ try {
     } finally { $zip.Dispose() }
     Move-Item -LiteralPath $pending -Destination $archive -Force
     $symbols = Join-Path $build 'src/Release/Precision.pdb'
-    if (Test-Path -LiteralPath $symbols) { Copy-Item -LiteralPath $symbols -Destination (Join-Path $output 'Precision.pdb') -Force }
+    if (Test-Path -LiteralPath $symbols) {
+        $symbolOutput = Join-Path $buildData 'Symbols'
+        [IO.Directory]::CreateDirectory($symbolOutput) | Out-Null
+        Copy-Item -LiteralPath $symbols -Destination (Join-Path $symbolOutput 'Precision.pdb') -Force
+    }
     Run 'python' @((Join-Path $PSScriptRoot 'tools/package_public.py'), '--root', $sourceRoot, '--archive', $archive, '--manifest', $manifestPath)
-    Run 'python' @((Join-Path $PSScriptRoot 'tools/build_installer.py'), '--runtime', $archive, '--output', (Join-Path $output 'Redsand Particles - Installer.zip'), '--manifest', $manifestPath)
-    Run 'python' @((Join-Path $PSScriptRoot 'tools/verify_installer.py'), '--archive', (Join-Path $output 'Redsand Particles - Installer.zip'), '--runtime', $archive, '--decoder', (Join-Path $testBuild 'Release/impact_vfx_tests.exe'), '--manifest', $manifestPath)
-    Write-Host "Created: $archive"
+    $installer = Join-Path $WorkRoot 'Redsand Particles.zip'
+    Run 'python' @((Join-Path $PSScriptRoot 'tools/build_installer.py'), '--runtime', $archive, '--output', $installer, '--manifest', $manifestPath)
+    Run 'python' @((Join-Path $PSScriptRoot 'tools/verify_installer.py'), '--archive', $installer, '--runtime', $archive, '--decoder', (Join-Path $testBuild 'Release/impact_vfx_tests.exe'), '--manifest', $manifestPath)
+    $release = Join-Path $output 'Redsand Particles.zip'
+    Copy-Item -LiteralPath $installer -Destination $release -Force
+    Write-Host "Created Nexus installer: $release"
     if ($KeepWork) {
         Write-Host 'Build completed. Generated intermediates retained by -KeepWork.'
         exit 0

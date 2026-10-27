@@ -17,6 +17,8 @@ class PackageOptionalDocsTests(unittest.TestCase):
                 root = Path(temporary)
                 output = root / 'output'
                 output.mkdir()
+                build_data = root / 'cache/BuildData'
+                build_data.mkdir(parents=True)
                 (root / 'source').mkdir()
                 (root / 'source/example.cpp').write_text('int value() { return 3; }\n', encoding='utf-8')
                 (root / 'LICENSE').write_text('retained license\n', encoding='utf-8')
@@ -34,8 +36,8 @@ class PackageOptionalDocsTests(unittest.TestCase):
                     path = root / relative
                     path.parent.mkdir(parents=True, exist_ok=True)
                     path.write_bytes(content)
-                runtime = output / 'runtime.zip'
-                manifest = output / 'BUILD.json'
+                runtime = build_data / 'runtime.zip'
+                manifest = build_data / 'BUILD.json'
                 manifest.write_text('{}', encoding='utf-8')
                 (root / 'SOURCE-PROVENANCE.json').write_text(json.dumps({'current_maxsu_dll_sha256': 'obsolete'}), encoding='utf-8')
                 binaries = {'SKSE/Plugins/Precision.dll': b'precision-fixture'}
@@ -69,7 +71,9 @@ class PackageOptionalDocsTests(unittest.TestCase):
                 self.assertTrue(record['publicationPackage'])
                 self.assertFalse(record['donationPointsEnabled'])
                 self.assertNotIn('current_maxsu_dll_sha256', json.loads((root / 'SOURCE-PROVENANCE.json').read_text('utf-8')))
-                with zipfile.ZipFile(output / 'BuildData/Sources/Redsand Particles - Corresponding Source.zip') as archive:
+                self.assertEqual(list(output.iterdir()), [])
+                self.assertEqual(Path(record['correspondingSourceArchive']), Path('cache/BuildData/Sources/Redsand Particles - Corresponding Source.zip'))
+                with zipfile.ZipFile(build_data / 'Sources/Redsand Particles - Corresponding Source.zip') as archive:
                     self.assertIn('source/example.cpp', archive.namelist())
                     self.assertEqual(archive.read('README.md'), original_readme)
                     self.assertEqual(archive.read('LICENSE'), (root / 'LICENSE').read_bytes())

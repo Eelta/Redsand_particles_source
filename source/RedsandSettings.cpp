@@ -53,6 +53,13 @@ namespace RedsandSettings
 			};
 			if (config.language != Language::English && config.language != Language::Chinese) { config.language = Language::English; }
 			if (config.blockStyle >= BlockStyle::Count) { config.blockStyle = BlockStyle::NormalBlock; }
+			config.swordRibbonLifetime = valid(config.swordRibbonLifetime, .8f, .03f, .2f);
+			config.swordParticleLifetime = std::max(config.swordRibbonLifetime+.02f, valid(config.swordParticleLifetime, 1.2f, .05f, .3f));
+			config.swordRibbonWidth = valid(config.swordRibbonWidth, 3.f, .15f, .5f);
+			config.swordTrailMomentum = valid(config.swordTrailMomentum, 1.f, 0.f, .1f);
+			config.swordRibbonFadeOut = valid(config.swordRibbonFadeOut, 1.2f, .06f, .25f);
+			config.swordParticleFadeOut = std::max(config.swordRibbonLifetime+config.swordRibbonFadeOut+.04f-config.swordParticleLifetime, valid(config.swordParticleFadeOut, 1.6f, .08f, .4f));
+			config.swordParticleGravity = valid(config.swordParticleGravity, 3.f, 0.f, .3f);
 			config.swordBrightness = valid(config.swordBrightness, maxBrightness);
 			config.swordDensity = valid(config.swordDensity, maxDensity);
 			config.swordSpread = valid(config.swordSpread, maxSpread, 0.0f, defaultSpread);
@@ -64,8 +71,8 @@ namespace RedsandSettings
 			config.impactSize = valid(config.impactSize, maxSize, minSize);
 			config.cutLength = valid(config.cutLength, maxCutLength, minCutLength);
 			config.slashDistance = valid(config.slashDistance, maxSlashDistance, minSlashDistance, defaultSlashDistance);
-			config.slashSpread = valid(config.slashSpread, maxSlashSpread);
-			config.slashDensity = valid(config.slashDensity, maxSlashDensity);
+			config.slashSpread = valid(config.slashSpread, maxSlashSpread, 0.f, 0.f);
+			config.slashDensity = valid(config.slashDensity, maxSlashDensity, 0.f, 0.f);
 			config.slashRandomRange = valid(config.slashRandomRange, 1.f, 0.f, .5f);
             config.blockLightningChance = valid(config.blockLightningChance, 1.f, 0.f, .1f);
             config.blockLightningBrightness = valid(config.blockLightningBrightness, maxBrightness);
@@ -75,6 +82,29 @@ namespace RedsandSettings
             }
 			for (std::size_t i = 0; i < config.colors.size(); ++i) {
 				for (std::size_t k = 0; k < 3; ++k) { config.colors[i].rgb[k] = valid(config.colors[i].rgb[k], 1.f, 0.f, defaultColors[i].rgb[k]); }
+			}
+			if (config.enchantments.values) {
+				auto profiles = std::make_shared<EnchantmentProfiles::Map>(*config.enchantments.values);
+				for (auto& [key, appearance] : *profiles) {
+					appearance.swordRibbonLifetime = valid(appearance.swordRibbonLifetime, .8f, .03f, .2f);
+					appearance.swordParticleLifetime = std::max(appearance.swordRibbonLifetime+.02f, valid(appearance.swordParticleLifetime, 1.2f, .05f, .3f));
+					appearance.swordRibbonWidth = valid(appearance.swordRibbonWidth, 3.f, .15f, .5f);
+					appearance.swordTrailMomentum = valid(appearance.swordTrailMomentum, 1.f, 0.f, .1f);
+					appearance.swordRibbonFadeOut = valid(appearance.swordRibbonFadeOut, 1.2f, .06f, .25f);
+					appearance.swordParticleFadeOut = std::max(appearance.swordRibbonLifetime+appearance.swordRibbonFadeOut+.04f-appearance.swordParticleLifetime, valid(appearance.swordParticleFadeOut, 1.6f, .08f, .4f));
+					appearance.swordParticleGravity = valid(appearance.swordParticleGravity, 3.f, 0.f, .3f);
+					appearance.brightness = valid(appearance.brightness, maxBrightness);
+					appearance.density = valid(appearance.density, maxDensity);
+					appearance.size = valid(appearance.size, maxSize, minSize);
+					appearance.spread = valid(appearance.spread, maxSpread);
+					appearance.bowBrightness = valid(appearance.bowBrightness, maxBrightness);
+					appearance.bowDensity = valid(appearance.bowDensity, maxDensity);
+					appearance.bowSize = valid(appearance.bowSize, maxSize, minSize);
+					for (auto& channel : appearance.bowColor.rgb) { channel = valid(channel, 1.f, 0.f, 0.f); }
+					for (auto& channel : appearance.color.rgb) { channel = valid(channel, 1.f, 0.f, 0.f); }
+				}
+				std::erase_if(*profiles, [](const auto& item) { return item.first.empty() || item.first.find_first_of("[];#\r\n=") != std::string::npos; });
+				config.enchantments.values = std::move(profiles);
 			}
 			return config;
 		}
@@ -157,6 +187,14 @@ namespace RedsandSettings
 					else if (key == "player") { ReadBool(value, result.swordPlayer); }
 					else if (key == "npc") { ReadBool(value, result.swordNPC); }
 					else if (key == "tip") { ReadBool(value, result.swordTip); }
+					else if (key == "releasedtrail") { ReadBool(value, result.swordReleasedTrail); }
+					else if (key == "ribbonlifetime") { ReadFloat(value, result.swordRibbonLifetime); }
+					else if (key == "particlelifetime") { ReadFloat(value, result.swordParticleLifetime); }
+					else if (key == "ribbonwidth") { ReadFloat(value, result.swordRibbonWidth); }
+					else if (key == "trailmomentum") { ReadFloat(value, result.swordTrailMomentum); }
+					else if (key == "ribbonfadeout") { ReadFloat(value, result.swordRibbonFadeOut); }
+					else if (key == "particlefadeout") { ReadFloat(value, result.swordParticleFadeOut); }
+					else if (key == "particlegravity") { ReadFloat(value, result.swordParticleGravity); }
 					else if (key == "keepprecisiontrail") { ReadBool(value, result.swordKeepPrecisionTrail); }
 					else if (key == "brightness") { ReadFloat(value, result.swordBrightness); }
 					else if (key == "density") { ReadFloat(value, result.swordDensity); }
@@ -200,6 +238,45 @@ namespace RedsandSettings
                     else if (key == "r") { ReadFloat(value, result.blockLightningColor[0]); }
                     else if (key == "g") { ReadFloat(value, result.blockLightningColor[1]); }
                     else if (key == "b") { ReadFloat(value, result.blockLightningColor[2]); }
+				} else if (section.starts_with("enchantment.")) {
+					const auto profileKey = section.substr(12);
+					auto appearance = result.enchantments.Find(profileKey) ? *result.enchantments.Find(profileKey) : EnchantmentAppearance{};
+					if (key == "enabled") { ReadBool(value, appearance.enabled); }
+					else if (key == "customcolor") { ReadBool(value, appearance.color.custom); }
+					else if (key == "r") { ReadFloat(value, appearance.color.rgb[0]); }
+					else if (key == "g") { ReadFloat(value, appearance.color.rgb[1]); }
+					else if (key == "b") { ReadFloat(value, appearance.color.rgb[2]); }
+					else if (key == "brightness") { ReadFloat(value, appearance.brightness); }
+					else if (key == "density") { ReadFloat(value, appearance.density); }
+					else if (key == "size") { ReadFloat(value, appearance.size); }
+					else if (key == "spread") { ReadFloat(value, appearance.spread); }
+					else if (key == "releasedtrail") { ReadBool(value, appearance.swordReleasedTrail); }
+					else if (key == "ribbonlifetime") { ReadFloat(value, appearance.swordRibbonLifetime); }
+					else if (key == "particlelifetime") { ReadFloat(value, appearance.swordParticleLifetime); }
+					else if (key == "ribbonwidth") { ReadFloat(value, appearance.swordRibbonWidth); }
+					else if (key == "trailmomentum") { ReadFloat(value, appearance.swordTrailMomentum); }
+					else if (key == "ribbonfadeout") { ReadFloat(value, appearance.swordRibbonFadeOut); }
+					else if (key == "particlefadeout") { ReadFloat(value, appearance.swordParticleFadeOut); }
+					else if (key == "particlegravity") { ReadFloat(value, appearance.swordParticleGravity); }
+					else if (key == "swordenabled") { ReadBool(value, appearance.swordEnabled); }
+					else if (key == "swordplayer") { ReadBool(value, appearance.swordPlayer); }
+					else if (key == "swordnpc") { ReadBool(value, appearance.swordNPC); }
+					else if (key == "swordtip") { ReadBool(value, appearance.swordTip); }
+					else if (key == "swordkeepprecisiontrail") { ReadBool(value, appearance.swordKeepPrecisionTrail); }
+					else if (key == "bowenabled") { ReadBool(value, appearance.bowEnabled); }
+					else if (key == "bowplayer") { ReadBool(value, appearance.bowPlayer); }
+					else if (key == "bownpc") { ReadBool(value, appearance.bowNPC); }
+					else if (key == "bowgathering") { ReadBool(value, appearance.bowGathering); }
+					else if (key == "bowrings") { ReadBool(value, appearance.bowRings); }
+					else if (key == "bowtrails") { ReadBool(value, appearance.bowTrails); }
+					else if (key == "bowcustomcolor") { ReadBool(value, appearance.bowColor.custom); }
+					else if (key == "bowbrightness") { ReadFloat(value, appearance.bowBrightness); }
+					else if (key == "bowdensity") { ReadFloat(value, appearance.bowDensity); }
+					else if (key == "bowsize") { ReadFloat(value, appearance.bowSize); }
+					else if (key == "bowr") { ReadFloat(value, appearance.bowColor.rgb[0]); }
+					else if (key == "bowg") { ReadFloat(value, appearance.bowColor.rgb[1]); }
+					else if (key == "bowb") { ReadFloat(value, appearance.bowColor.rgb[2]); }
+					result.enchantments.Set(profileKey, appearance);
 				} else if (section.starts_with("color.")) {
 					for (std::size_t i = 0; i < colorNames.size(); ++i) {
 						if (section.substr(6) != Lower(colorNames[i])) { continue; }
@@ -240,6 +317,14 @@ namespace RedsandSettings
 					<< "NPC=" << config.swordNPC << '\n'
 					<< "Tip=" << config.swordTip << '\n'
 					<< "KeepPrecisionTrail=" << config.swordKeepPrecisionTrail << '\n'
+					<< "ReleasedTrail=" << config.swordReleasedTrail << '\n'
+					<< "RibbonLifetime=" << config.swordRibbonLifetime << '\n'
+					<< "ParticleLifetime=" << config.swordParticleLifetime << '\n'
+					<< "RibbonWidth=" << config.swordRibbonWidth << '\n'
+					<< "TrailMomentum=" << config.swordTrailMomentum << '\n'
+					<< "RibbonFadeOut=" << config.swordRibbonFadeOut << '\n'
+					<< "ParticleFadeOut=" << config.swordParticleFadeOut << '\n'
+					<< "ParticleGravity=" << config.swordParticleGravity << '\n'
 					<< "Brightness=" << config.swordBrightness << '\n'
 					<< "Density=" << config.swordDensity << '\n'
 					<< "Spread=" << config.swordSpread << '\n'
@@ -285,6 +370,41 @@ namespace RedsandSettings
 					const auto& color = config.colors[i];
 					output << "\n[Color." << colorNames[i] << "]\nEnabled=" << color.custom
 						<< "\nR=" << color.rgb[0] << "\nG=" << color.rgb[1] << "\nB=" << color.rgb[2] << '\n';
+				}
+				if (config.enchantments.values) {
+					for (const auto& [key, appearance] : *config.enchantments.values) {
+						output << "\n[Enchantment." << key << "]\nEnabled=" << appearance.enabled
+							<< "\nCustomColor=" << appearance.color.custom
+							<< "\nR=" << appearance.color.rgb[0] << "\nG=" << appearance.color.rgb[1] << "\nB=" << appearance.color.rgb[2]
+							<< "\nBrightness=" << appearance.brightness << "\nDensity=" << appearance.density
+							<< "\nSize=" << appearance.size << "\nSpread=" << appearance.spread
+							<< "\nReleasedTrail=" << appearance.swordReleasedTrail
+							<< "\nRibbonLifetime=" << appearance.swordRibbonLifetime
+							<< "\nParticleLifetime=" << appearance.swordParticleLifetime
+							<< "\nRibbonWidth=" << appearance.swordRibbonWidth
+							<< "\nTrailMomentum=" << appearance.swordTrailMomentum
+							<< "\nRibbonFadeOut=" << appearance.swordRibbonFadeOut
+							<< "\nParticleFadeOut=" << appearance.swordParticleFadeOut
+							<< "\nParticleGravity=" << appearance.swordParticleGravity
+							<< "\nSwordEnabled=" << appearance.swordEnabled
+							<< "\nSwordPlayer=" << appearance.swordPlayer
+							<< "\nSwordNPC=" << appearance.swordNPC
+							<< "\nSwordTip=" << appearance.swordTip
+							<< "\nSwordKeepPrecisionTrail=" << appearance.swordKeepPrecisionTrail
+							<< "\nBowEnabled=" << appearance.bowEnabled
+							<< "\nBowPlayer=" << appearance.bowPlayer
+							<< "\nBowNPC=" << appearance.bowNPC
+							<< "\nBowGathering=" << appearance.bowGathering
+							<< "\nBowRings=" << appearance.bowRings
+							<< "\nBowTrails=" << appearance.bowTrails
+							<< "\nBowCustomColor=" << appearance.bowColor.custom
+							<< "\nBowBrightness=" << appearance.bowBrightness
+							<< "\nBowDensity=" << appearance.bowDensity
+							<< "\nBowSize=" << appearance.bowSize
+							<< "\nBowR=" << appearance.bowColor.rgb[0]
+							<< "\nBowG=" << appearance.bowColor.rgb[1]
+							<< "\nBowB=" << appearance.bowColor.rgb[2] << '\n';
+					}
 				}
 				output.flush();
 				if (!output) { return false; }

@@ -26,8 +26,7 @@ class ShockwaveAssetsTests(unittest.TestCase):
              patch.object(builtins, 'open', side_effect=AssertionError('Unexpected file input')):
             self.assertEqual(make_nif(), self.data)
         paths = list(relative_paths())
-        self.assertEqual(len(paths), 65)
-        self.assertEqual(len(set(paths)), 65)
+        self.assertEqual(paths, ['Meshes/StellarImpact/Refraction/SoftRefraction.nif'])
         for relative in paths:
             with self.subTest(model=relative):
                 self.assertEqual((ASSETS / relative).read_bytes(), self.data)

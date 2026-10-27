@@ -1,3 +1,22 @@
+if (redsandReleasedSelected) {
+    redsandConfig=RedsandSettings::Get();
+    RedsandSettings::ApplyMeleeAppearance(redsandConfig,redsandEnchantmentKey,redsandEnchantmentFallback);
+    auto actor=actorHandle.get();
+    if (!actor || !redsandConfig.swordEnabled || !(actor->IsPlayerRef() ? redsandConfig.swordPlayer : redsandConfig.swordNPC)) {
+        if (trailParticle) { if (trailParticle->particleObject) { trailParticle->particleObject->SetAppCulled(true); } trailParticle->age=trailParticle->lifetime+1.f; }
+        bActive=false;return false;
+    }
+    if (!redsandChecked && trailParticle && trailParticle->particleObject) {
+        RE::BSVisit::TraverseScenegraphGeometries(trailParticle->particleObject.get(),[&](RE::BSGeometry* geometry) {
+            if (geometry->name=="RedsandParticles_Drain_v1"sv) {
+                if (auto* system=netimmerse_cast<RE::NiParticleSystem*>(geometry)) { redsandSystems.emplace_back(system); }
+            }
+            return RE::BSVisit::BSVisitControl::kContinue;
+        });
+        redsandChecked=true;
+    }
+    return UpdateRedsandSwingTrail(a_deltaTime);
+}
 if (!redsandNativeOnly && !redsandChecked && trailParticle && trailParticle->particleObject) {
 			CacheRedsandEmissionMeshes(trailParticle->particleObject.get());
 			RE::BSVisit::TraverseScenegraphGeometries(trailParticle->particleObject.get(), [&](RE::BSGeometry* geometry) {
@@ -71,6 +90,7 @@ if (!redsandNativeOnly && !redsandChecked && trailParticle && trailParticle->par
 		}
 		if (redsandManaged) {
 			redsandConfig = RedsandSettings::Get();
+			RedsandSettings::ApplyMeleeAppearance(redsandConfig, redsandEnchantmentKey, redsandEnchantmentFallback);
 			auto actor = actorHandle.get();
 			if (!actor || !redsandConfig.swordEnabled || !(actor->IsPlayerRef() ? redsandConfig.swordPlayer : redsandConfig.swordNPC)) {
 				trailParticle->particleObject->SetAppCulled(true);

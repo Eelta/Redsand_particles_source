@@ -147,8 +147,8 @@ def main():
                       bytes_before=path.stat().st_size, bytes_after=len(optimized.to_bytes()))
         results[path.relative_to(args.assets).as_posix()] = result
         staged.append((path, optimized))
-    if len(results) != 65:
-        raise ValueError(f'Expected all 65 preset models; found {len(results)}')
+    if len(results) != 1:
+        raise ValueError(f'Expected one shared slash model; found {len(results)}')
     if args.apply:
         for path, optimized in staged:
             optimized.write(path)

@@ -142,6 +142,7 @@ struct Stream
 	RE::NiColorA rendererColor{ 0.f, 0.f, 0.f, 0.f };
 	Redsand::Bow::Simulation simulation;
 	std::string meshPath = "renderer-fixture.nif";
+    std::string enchantmentKey = "none", enchantmentFallback = "none";
 	float age = 0.f, rendererStartAge = 0.f, rendererBrightness = -1.f;
 	float chargeTime = 0.f, silence = 0.f;
 	std::uint64_t chargeSequence = 0;
@@ -570,6 +571,28 @@ void liveColorRestoresInheritedTint()
 	check(PrepareRenderer(fixture.stream) == RendererStatus::Ready && fixture.stream.rendererColor.red == inherited.red, "bow tint did not restore after disabling RGB");
 }
 
+void separateEnchantmentColorOverridesGlobalAndRestores()
+{
+    Fixture fixture;
+    fixture.Ready();
+    fixture.stream.enchantmentKey = "fire";
+    fixture.stream.enchantmentFallback.clear();
+    auto config = RedsandSettings::Get();
+    config.colors[1] = {true, {1.f, 0.f, 0.f}};
+    RedsandSettings::EnchantmentAppearance profile;
+    profile.enabled = true; profile.bowColor.custom = true; profile.bowColor.rgb = {.2f, .4f, .8f};
+    config.enchantments.Set(fixture.stream.enchantmentKey, profile);
+    RedsandSettings::Set(config);
+    check(PrepareRenderer(fixture.stream) == RendererStatus::Ready && fixture.stream.rendererColor.blue == .8f,
+        "exact bow enchantment color lost to global custom color");
+    profile.bowColor.custom = false; config.enchantments.Set(fixture.stream.enchantmentKey, profile); RedsandSettings::Set(config);
+    check(PrepareRenderer(fixture.stream) == RendererStatus::Ready && fixture.stream.rendererColor.red == fixture.stream.color.red,
+        "automatic enchantment hue did not override global custom color");
+    profile.enabled = false; config.enchantments.Set(fixture.stream.enchantmentKey, profile); RedsandSettings::Set(config);
+    check(PrepareRenderer(fixture.stream) == RendererStatus::Ready && fixture.stream.rendererColor.red == 1.f,
+        "disabling exact bow profile failed to restore global settings");
+}
+
 int main() try
 {
 	delayedResources();
@@ -581,6 +604,7 @@ int main() try
 	diagnosticRateAndDisabledWork();
 	hiddenEffectRootRecoversOnlyForItsLiveParticles();
 	liveColorRestoresInheritedTint();
+    separateEnchantmentColorOverridesGlobalAndRestores();
 	std::cout << "PASS: production renderer loading, isolated failure, scene graph replacement and live brightness\n";
 }
 catch (const std::exception& error)

@@ -27,6 +27,8 @@ const auto redsandRequestedMesh = redsandConfig.diagnostics ? trailMeshPath : st
 				}
 			}
 		}
+		redsandReleasedSelected = redsandReleasedSelected && Redsand::Weapons::IsParticleMesh(trailMeshPath);
+		if (redsandReleasedSelected) { trailMeshPath = "RedsandSwingTrail/Arc.nif"; }
 		redsandParticleSelected = Redsand::Weapons::IsParticleMesh(trailMeshPath);
 		if (redsandConfig.diagnostics) {
 			RedsandLog::info("Redsand melee scope: actor={:08X} player={} weapon={:08X} weaponType={} profile={} enabled={} playerEnabled={} npcEnabled={} allowed={} requested={} resolved={}",

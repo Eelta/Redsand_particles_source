@@ -83,7 +83,7 @@ namespace Redsand::Weapons
 				break;
 			}
 		}
-		for (const auto prefix : std::array<std::string_view, 2>{ "RedsandParticles/", "Effects/WeaponTrails/ElementalDesert/" }) {
+		for (const auto prefix : std::array<std::string_view, 3>{ "RedsandParticles/", "Effects/WeaponTrails/ElementalDesert/", "RedsandSwingTrail/" }) {
 			if (path.size() >= prefix.size() && detail::EqualMeshPath(path.substr(0, prefix.size()), prefix)) { return true; }
 		}
 		return false;

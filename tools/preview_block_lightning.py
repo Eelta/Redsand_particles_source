@@ -59,7 +59,7 @@ for(let i=0;i<data.length;i++){const aa=animation.frames[f][i],bb=animation.fram
 let m=mul(data[i].parent<0?root:matrices[data[i].parent],mul(transform(...o),rotate(x,y,z)));matrices.push(m);if(elapsed<animation.duration&&alpha>0)draw(meshes[i],m,[...color.map(x=>x*1.5),alpha],gl.TRIANGLES,[head,tail]);}
 gl.depthMask(true);document.getElementById('phase').textContent=elapsed<animation.duration?`电流推进 / 尾段消散 ${elapsed.toFixed(2)}s`:'等待下一次格挡';requestAnimationFrame(frame)}requestAnimationFrame(frame);
 </script>'''
-out = ROOT/'output/Publication/Previews/Block Lightning 3D.html'
+out = ROOT/'cache/Previews/Block Lightning 3D.html'
 out.parent.mkdir(parents=True, exist_ok=True)
 out.write_text(HTML.replace('PAYLOAD', json.dumps(branches, separators=(',', ':'))).replace('ANIMATION', json.dumps(animation, separators=(',', ':'))), 'utf-8')
 print(out)

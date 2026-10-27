@@ -637,7 +637,7 @@ def generate() -> tuple[int, int]:
         pixels = texture_pixels(profile)
         (TEXTURES / f"{profile.name}.dds").write_bytes(dds_bytes(pixels))
         (BASE / f"{profile.name}.nif").write_bytes(variant_bytes(source, profile))
-    preview = ROOT / "output/weapon-particle-styles.png"
+    preview = ROOT / "cache/Previews/weapon-particle-styles.png"
     preview.parent.mkdir(parents=True, exist_ok=True)
     preview.write_bytes(preview_bytes())
     return len(PROFILES), len(PROFILES)
@@ -665,4 +665,4 @@ if __name__ == "__main__":
     else:
         meshes, textures = generate()
         print(f"Generated {meshes} NIF variants, {textures} BGRA8 DDS textures with full mip chains")
-        print(ROOT / "output/weapon-particle-styles.png")
+        print(ROOT / "cache/Previews/weapon-particle-styles.png")

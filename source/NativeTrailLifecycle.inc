@@ -5,7 +5,7 @@ AttackTrail::~AttackTrail()
 
 bool AttackTrail::ShouldAddPrecisionTrail() const
 {
-	return !redsandNativeOnly && redsandParticleSelected && redsandScopeAllowed &&
+	return !redsandReleasedSelected && !redsandNativeOnly && redsandParticleSelected && redsandScopeAllowed &&
 		redsandConfig.swordKeepPrecisionTrail && trailParticle;
 }
 

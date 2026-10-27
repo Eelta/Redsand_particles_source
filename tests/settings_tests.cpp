@@ -61,6 +61,10 @@ namespace
 		const auto path = workspace.path / "sword-defaults.ini";
 		RedsandSettings::Load(path);
 		const auto defaults = RedsandSettings::Get();
+		Check(defaults.swordReleasedTrail && defaults.swordRibbonLifetime == .2f && defaults.swordParticleLifetime == .3f &&
+			defaults.swordRibbonWidth == .5f && defaults.swordTrailMomentum == .1f && defaults.swordRibbonFadeOut == .25f &&
+			defaults.swordParticleFadeOut == .4f && defaults.swordParticleGravity == .3f,
+			"Nexus Redsand preset differs from the approved defaults");
 		Check(defaults.swordTip && defaults.swordBrightness == 1.0f && defaults.swordDensity == 1.0f &&
 			defaults.swordSpread == 1.0f && defaults.swordSize == 1.0f,
 			"new melee defaults must enable sword-tip attachment and use unit multipliers");
@@ -92,8 +96,11 @@ namespace
 		Check(expected.language == RedsandSettings::Language::English && expected.swordSpread == 1.0f && expected.swordSize == 1.0f,
 			"new default language, spread or size changed");
 		expected.swordDensity = 0.5f;
+		expected.swordRibbonFadeOut=.3f;expected.swordParticleFadeOut=.6f;expected.swordParticleGravity=0.f;
 		RedsandSettings::Set(expected);
 		RedsandSettings::FlushPendingSave();
+		RedsandSettings::Load(path);
+		Check(RedsandSettings::Get()==expected,"global fade/gravity settings or zero-gravity choice did not survive reload");
 		Check(Read(path).find("StaffParticles") == std::string::npos, "removed staff section was written back");
 	}
 
@@ -292,7 +299,7 @@ namespace
 		Check(Read(path).find("PreserveValhallaRing") == std::string::npos, "removed combat integration setting was still saved");
 		Write(path, "[ImpactVFX]\nBrightnessLevel=nan\nDensityLevel=1.5\nSizeLevel=junk\n");
 		RedsandSettings::Load(path);
-		Check(RedsandSettings::Get().impactBrightness == 1 && RedsandSettings::Get().impactDensity == 1 &&
+		Check(RedsandSettings::Get().impactBrightness == 1 && RedsandSettings::Get().impactDensity == .1f &&
 			RedsandSettings::Get().impactSize == 1, "invalid levels did not retain preset defaults");
 		config = RedsandSettings::Get(); config.impactBrightness = 99; config.impactDensity = -8;
 		RedsandSettings::Set(config);
@@ -485,7 +492,7 @@ int main()
 		travel = RedsandSettings::Get(); travel.slashDensity = -1.f; RedsandSettings::Set(travel);
 		Check(RedsandSettings::Get().slashDensity == 0.f, "rebased slash quantity lower bound failed");
 		travel.slashDensity = std::numeric_limits<float>::quiet_NaN(); RedsandSettings::Set(travel);
-		Check(RedsandSettings::Get().slashDensity == 1.f, "invalid rebased slash quantity did not restore unit default");
+		Check(RedsandSettings::Get().slashDensity == 0.f, "invalid slash quantity did not restore disabled default");
 		travel.slashDensity = 3.f; RedsandSettings::Set(travel); RedsandSettings::FlushPendingSave(); RedsandSettings::Load(travelPath);
 		Check(RedsandSettings::Get().slashDensity == 1.f, "runtime rebased slash quantity upper bound did not persist");
 		std::cout << "Runtime settings, persistence and thread snapshot checks passed\n";

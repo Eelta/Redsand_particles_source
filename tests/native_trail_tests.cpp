@@ -33,6 +33,7 @@ struct AttackTrail
 		passedCell(cell), passedItem(item), passedLeft(left), passedLength(length), passedOverride(supplied)
 	{
 		redsandConfig = RedsandSettings::Get();
+        redsandReleasedSelected = !native && redsandConfig.swordReleasedTrail;
 		redsandParticleSelected = selectedParticle;
 		redsandScopeAllowed = scopeAllowed;
 	}
@@ -45,9 +46,11 @@ struct AttackTrail
 		++visualUpdates;
 		return bActive;
 	}
-	bool redsandNativeOnly, redsandParticleSelected = false, redsandScopeAllowed = false, bActive = true;
+	bool redsandReleasedSelected = false;
+    bool redsandNativeOnly, redsandParticleSelected = false, redsandScopeAllowed = false, bActive = true;
 	float redsandNativePendingTime = 0.f;
 	RedsandSettings::Config redsandConfig;
+    std::string redsandEnchantmentKey = "none";
 	Handle actorHandle;
 	Node* collisionNode;
 	Node* collisionParentNode;
@@ -85,6 +88,7 @@ void RegistrationKeepsTwoVisualsWithoutRecursion()
 			for (const bool allowed : { false, true }) {
 				trails.clear();
 				RedsandSettings::current = {};
+				RedsandSettings::current.swordReleasedTrail = false;
 				RedsandSettings::current.swordKeepPrecisionTrail = keep;
 				selectedParticle = selected;
 				scopeAllowed = allowed;
@@ -114,6 +118,8 @@ void NativeOnlyLifecycleIsBoundedAndSwitchable()
 {
 	Node node;
 	auto make = [&] { return std::make_unique<AttackTrail>(&node, Handle{ &node }, 1, nullptr, false, false, std::nullopt, true); };
+	RedsandSettings::current = {};
+	RedsandSettings::current.swordReleasedTrail = false;
 	RedsandSettings::current.swordKeepPrecisionTrail = true;
 	for (unsigned i = 0; i < 1000; ++i) {
 		auto trail = make();
@@ -218,6 +224,12 @@ int main()
 			!InsufficientEnchantmentCharge(false, true, false, 0., false, -1.f, 0.f) &&
 			!InsufficientEnchantmentCharge(false, false, true, 0., false, -1.f, -1.f),
 			"sufficient charge, poison, free enchantment or plain weapon lost existing color policy");
+        {
+            Node node; int item=0; RedsandSettings::current={}; RedsandSettings::current.swordReleasedTrail=true;
+            AttackTrail replacement(&node,{&node},1,&item,false,false,{});
+            Check(!replacement.ShouldAddPrecisionTrail(),"replacement mode stacked the original Precision ribbon");
+            RedsandSettings::current={};
+        }
 		RegistrationKeepsTwoVisualsWithoutRecursion();
 		NativeOnlyLifecycleIsBoundedAndSwitchable();
 		NativeOverrideDoesNotInheritParticleOnlyDefinition();

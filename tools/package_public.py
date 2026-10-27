@@ -39,7 +39,7 @@ def main():
     args = parser.parse_args()
     root = args.root.resolve()
     output = args.archive.resolve().parent
-    source_output = root / 'output/BuildData/Sources'
+    source_output = root / 'cache/BuildData/Sources'
     source_output.mkdir(parents=True, exist_ok=True)
     source_zip = source_output / 'Redsand Particles - Corresponding Source.zip'
     manifest = json.loads(args.manifest.read_text('utf-8-sig'))

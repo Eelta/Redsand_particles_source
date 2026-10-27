@@ -23,7 +23,8 @@ struct RendererDiagnostics
 			if (!copy) { return false; }
 			copy->CopyMembers(material);
 			const auto config = RedsandSettings::Get();
-			const auto& custom = config.colors[static_cast<unsigned>(RedsandSettings::ColorTarget::Bow)];
+			const auto* appearance = RedsandSettings::AppearanceFor(config, stream.enchantmentKey, stream.enchantmentFallback);
+			const auto& custom = appearance ? appearance->bowColor : config.colors[static_cast<unsigned>(RedsandSettings::ColorTarget::Bow)];
 			const RE::NiColorA color = custom.custom ? RE::NiColorA{ custom.rgb[0], custom.rgb[1], custom.rgb[2], stream.color.alpha } : stream.color;
 			copy->baseColor = color;
 			const float peak = std::max({ color.red, color.green, color.blue, 0.f });
@@ -138,7 +139,8 @@ struct RendererDiagnostics
 					if (stream.rendererResourcesPending && diagnostics) { ++rendererDiagnostics.recovered; }
 					stream.rendererResourcesPending = false;
 					const auto config = RedsandSettings::Get();
-					const auto& custom = config.colors[static_cast<unsigned>(RedsandSettings::ColorTarget::Bow)];
+					const auto* appearance = RedsandSettings::AppearanceFor(config, stream.enchantmentKey, stream.enchantmentFallback);
+			const auto& custom = appearance ? appearance->bowColor : config.colors[static_cast<unsigned>(RedsandSettings::ColorTarget::Bow)];
 					const RE::NiColorA wanted = custom.custom ? RE::NiColorA{ custom.rgb[0], custom.rgb[1], custom.rgb[2], stream.color.alpha } : stream.color;
 					if (stream.rendererBrightness != brightness || stream.rendererColor.red != wanted.red || stream.rendererColor.green != wanted.green || stream.rendererColor.blue != wanted.blue) { ConfigureRendererMaterial(stream, system, brightness); }
 					if (diagnostics) { ReportRendererMaterial(stream, system); }

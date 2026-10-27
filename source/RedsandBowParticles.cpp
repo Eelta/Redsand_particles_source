@@ -7,6 +7,8 @@
 #include "RedsandBowEventState.h"
 #include "RedsandBowStreamBudget.h"
 #include "RedsandSettings.h"
+#include "RedsandEnchantmentProfiles.h"
+#include "Offsets.h"
 #include "RedsandWeaponProfiles.h"
 #include "Settings.h"
 #include "RE/N/NiParticleSystem.h"
@@ -193,6 +195,7 @@ namespace RedsandBowParticles
 			RE::NiColorA color{ 0.025f, 0.080f, 0.650f, 1.f };
 			RE::NiColorA rendererColor{ 0.f, 0.f, 0.f, 0.f };
 			std::string meshPath;
+			std::string enchantmentKey = "none", enchantmentFallback = "none";
 			RE::FormID weaponID = 0;
 			Vec3 tip;
 			float age = 0.f, chargeTime = 0.f, silence = 0.f;
@@ -288,17 +291,65 @@ namespace RedsandBowParticles
 			return nullptr;
 		}
 
-		RE::NiColorA Color(RE::Actor* actor, RE::FormID weaponID)
+		RedsandSettings::Config BowConfiguration(RE::Actor* actor, RE::FormID weaponID = 0)
 		{
-			if (!weaponID) { return { 0.025f, 0.080f, 0.650f, 1.f }; }
+			auto config = RedsandSettings::Get();
+			if (actor && config.enchantments.values && std::any_of(config.enchantments.values->begin(), config.enchantments.values->end(), [](const auto& item) { return item.second.enabled; })) {
+				auto* entry = BowEntry(actor, weaponID);
+				RedsandSettings::ApplyBowAppearance(config, RedsandEnchantmentProfiles::Key(entry, actor, entry == actor->GetEquippedEntryData(true)));
+			}
+			return config;
+		}
+		RedsandSettings::Config StreamConfiguration(const Stream& stream, RedsandSettings::Config config)
+		{
+			RedsandSettings::ApplyBowAppearance(config, stream.enchantmentKey);
+			return config;
+		}
 
+		RE::NiColorA Color(RE::Actor* actor, RE::FormID weaponID, std::string& key, std::string& fallback)
+		{
+			const RE::NiColorA blue{ .025f, .080f, .650f, 1.f };
+			auto* entry = BowEntry(actor, weaponID);
+			auto* magic = entry ? GetPoison(entry) : nullptr;
+			const bool poison = magic != nullptr;
+			if (!magic && entry) { magic = GetEnchantment(entry); }
+			const auto charge = entry ? entry->GetEnchantmentCharge() : std::optional<double>{};
+			if (magic && !Redsand::Weapons::EnchantmentHasCharge(poison, charge.has_value(), charge.value_or(0.))) {
+				key = "none"; fallback.clear(); return blue;
+			}
+			key = RedsandEnchantmentProfiles::Key(entry, actor, entry == actor->GetEquippedEntryData(true));
+			fallback.clear();
+			if (magic && key == "none") { return blue; }
 			AttackTrail selector(nullptr, actor->GetHandle(), nullptr, nullptr, false, false);
 			TrailDefinition definition;
-			auto* entry = BowEntry(actor, weaponID);
-			if (selector.GetTrailDefinition(actor->GetHandle(), entry, entry == actor->GetEquippedEntryData(true), definition, true) && definition.trailOverride.baseColorOverride) {
+			if (entry && selector.GetTrailDefinition(actor->GetHandle(), entry, entry == actor->GetEquippedEntryData(true), definition, true) && definition.trailOverride.baseColorOverride) {
+				fallback.clear();
 				return *definition.trailOverride.baseColorOverride;
 			}
-			return { 0.025f, 0.080f, 0.650f, 1.f };
+			const auto tint = Redsand::Weapons::ResolveEnchantmentTint(magic, [&](auto* item) -> std::optional<Redsand::Weapons::EnchantmentTint> {
+				auto* effect = item->baseEffect;
+				if (!effect) { return std::nullopt; }
+				using Tone = Redsand::Weapons::EnchantmentTone;
+				if (effect->HasKeywordString("MagicDamageFire")) { return Redsand::Weapons::TintFor(Tone::Fire); }
+				if (effect->HasKeywordString("MagicDamageFrost")) { return Redsand::Weapons::TintFor(Tone::Frost); }
+				if (effect->HasKeywordString("MagicDamageShock")) { return Redsand::Weapons::TintFor(Tone::Shock); }
+				if (poison) { return Redsand::Weapons::TintFor(Tone::Poison); }
+				if (const auto* shader = effect->data.enchantShader) {
+					const auto& data = shader->data;
+					return Redsand::Weapons::FirstEnchantmentHue(std::array{ data.fillTextureEffectColorKey1, data.edgeEffectColor,
+						data.fillTextureEffectColorKey2, data.fillTextureEffectColorKey3, data.colorKey1, data.colorKey2, data.colorKey3 });
+				}
+				return std::nullopt;
+			});
+			if (tint) { fallback = ""; return { tint->red, tint->green, tint->blue, 1.f }; }
+			return blue;
+		}
+
+		float StreamDensity(const Stream& stream, float density)
+		{
+			const auto config = RedsandSettings::Get();
+			const auto* appearance = RedsandSettings::AppearanceFor(config, stream.enchantmentKey, stream.enchantmentFallback);
+			return appearance ? appearance->bowDensity : density;
 		}
 
 		RE::TESObjectWEAP* EquippedBow(RE::Actor* actor)
@@ -486,6 +537,9 @@ namespace RedsandBowParticles
 
 		bool Render(Stream& stream, float brightness, bool diagnostics)
 		{
+			const auto config = RedsandSettings::Get();
+			const auto* appearance = RedsandSettings::AppearanceFor(config, stream.enchantmentKey, stream.enchantmentFallback);
+			if (appearance) { brightness = appearance->bowBrightness; }
 			const auto renderer = PrepareRenderer(stream, brightness, diagnostics);
 			if (renderer != RendererStatus::Ready) { return renderer == RendererStatus::Pending; }
 			auto* system = stream.system.get();
@@ -503,7 +557,7 @@ namespace RedsandBowParticles
 				const auto position = inverse * ToNi(p.position);
 				vertices.positions[i] = position;
 				vertices.color[i] = RE::NiColorA{ 1.f, 1.f, 1.f, p.Alpha() };
-				vertices.radii[i] = p.Size() / system->world.scale;
+				vertices.radii[i] = p.Size() * (appearance ? appearance->bowSize : 1.f) / system->world.scale;
 				vertices.sizes[i] = 1.f;
 				if (vertices.rotationAngles) { vertices.rotationAngles[i] = 0.f; }
 				if (vertices.rotationAxes) { vertices.rotationAxes[i] = { 0.f, 0.f, 1.f }; }
@@ -523,7 +577,7 @@ namespace RedsandBowParticles
 			runtime.addedParticleCount = 0;
 			runtime.addedParticlesBase = 0;
 			vertices.bound.center = (low + high) * 0.5f;
-			vertices.bound.radius = (high - low).Length() * 0.5f + 6.f / system->world.scale;
+			vertices.bound.radius = (high - low).Length() * 0.5f + 6.f * (appearance ? appearance->bowSize : 1.f) / system->world.scale;
 			if (!SubmitRendererVisibility(stream, count)) { return false; }
 			system->GetModelData().modelBound = vertices.bound;
 			system->UpdateWorldBound();
@@ -579,7 +633,7 @@ namespace RedsandBowParticles
 			auto* stream = recycled ? recycled : owned.get();
 			stream->actor = actor->GetHandle();
 			stream->tip = point;
-			stream->color = Color(actor, weaponID);
+			stream->color = Color(actor, weaponID, stream->enchantmentKey, stream->enchantmentFallback);
 			stream->weaponID = weaponID;
 			stream->simulation.SetStyle(profile == Redsand::Weapons::Profile::Bow ? Redsand::Bow::TrailStyle::VanillaBow :
 				profile == Redsand::Weapons::Profile::Crossbow ? Redsand::Bow::TrailStyle::VanillaCrossbow : Redsand::Bow::TrailStyle::Default);
@@ -594,6 +648,7 @@ namespace RedsandBowParticles
 		{
 			auto* weapon = EquippedBow(actor);
 			if (!weapon || actor->AsActorState()->GetWeaponState() != RE::WEAPON_STATE::kDrawn || !Allowed(actor)) { return; }
+			if (!BowConfiguration(actor, weapon->GetFormID()).bowGathering) { return; }
 			const auto handle = actor->GetHandle();
 			if (!chargeStates.contains(handle) && chargeStates.size() >= 128) { return; }
 			auto& state = chargeStates[handle];
@@ -612,7 +667,7 @@ namespace RedsandBowParticles
 				stream = CreateStream(actor, actor->GetParentCell(), tip, actor->GetFormID(), weapon->GetFormID());
 				if (!stream) { return; }
 				stream->charging = true;
-				stream->simulation.BeginGather(tip, density);
+				stream->simulation.BeginGather(tip, StreamDensity(*stream, density));
 			}
 			stream->tip = tip;
 			stream->chargeSequence = state.DrawSequence();
@@ -841,12 +896,17 @@ namespace RedsandBowParticles
 				chargeStates[event.actor].SignalOrdered(event.signal, event.sequence);
 			}
 		}, [&](const auto& sample) {
-			if (display && configuration.bowEnabled) { ProcessArrow(sample, density, configuration.bowRings, configuration.bowTrails); }
+			if (display) {
+				auto shooter = sample.shooter.get();
+				auto* actor = shooter ? shooter->As<RE::Actor>() : nullptr;
+				const auto current = BowConfiguration(actor, sample.weaponID);
+				ProcessArrow(sample, current.bowDensity, current.bowRings, current.bowTrails);
+			}
 		});
 		batchBirths.clear();
 
 		PruneSilentShots();
-		if (display && configuration.bowEnabled && configuration.bowGathering) {
+		if (display) {
 			if (player) { ObserveCharge(player, density, deltaTime); }
 			if (auto* processes = RE::ProcessLists::GetSingleton()) {
 				processes->ForEachHighActor([&](RE::Actor* actor) {
@@ -863,7 +923,7 @@ namespace RedsandBowParticles
 			if (stream->charging && stream->emitting) {
 				stream->silence = 0.f;
 				stream->chargeTime += deltaTime;
-				stream->simulation.Gather(deltaTime, stream->tip, density, stream->chargeTime);
+				stream->simulation.Gather(deltaTime, stream->tip, StreamDensity(*stream, density), stream->chargeTime);
 			}
 		}
 		std::erase_if(streams, [&](auto& stream) {

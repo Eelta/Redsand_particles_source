@@ -87,10 +87,6 @@ def ring(inner, outer):
 
 def relative_paths():
     yield 'Meshes/StellarImpact/Refraction/SoftRefraction.nif'
-    for brightness in range(4):
-        for density in range(4):
-            for size in range(4):
-                yield f'Meshes/StellarImpact/Runtime/B{brightness}D{density}S{size}/Refraction/SoftRefraction.nif'
 
 
 def make_nif():

@@ -52,10 +52,9 @@ def main(stage):
     nif_paths = list((stage / "Meshes/StellarImpact").rglob("*.nif"))
     families = ["Hit/StoneBurst.nif", "Hit/MetalBurst.nif", "Slash/AzureCrescentSlash.nif", "Slash/GoldBladeSlash.nif",
                 "Block/NormalBlock.nif", "Block/TimedSparks.nif", "Block/TimedFlare.nif", "Block/PerfectRing.nif", "Block/SimpleTimed.nif", "Refraction/SoftRefraction.nif"]
-    expected_nifs = {"Runtime/Off.nif", "Block/StarRing.nif"} | set(families)
-    expected_nifs.update(f"Runtime/B{b}D{d}S{s}/{family}" for b in range(4) for d in range(4) for s in range(4) for family in families)
+    expected_nifs = {"Block/StarRing.nif"} | set(families)
     check({p.relative_to(stage / "Meshes/StellarImpact").as_posix() for p in nif_paths} == expected_nifs,
-          "Expected ten base + 640 preset + one off and one private star-ring NIF")
+          "Expected ten shared base models and one private star-ring model; legacy preset copies must be omitted")
     texture_refs = set()
     for path in nif_paths:
         data = path.read_bytes(); types = nif(data)
@@ -87,8 +86,8 @@ def main(stage):
         check(route['plugin'] == 'Skyrim.esm', "External combat form override remains")
         check(len(route["models"]) == 64, "Wrong preset count")
         for i, model in enumerate(route["models"]):
-            check(f"\\B{i // 16}D{i // 4 % 4}S{i % 4}\\" in model, "Wrong preset addressing")
-            check((stage / "Meshes" / model.replace("\\", "/")).is_file(), "Missing runtime preset")
+            check(model == route['baseModel'], "Legacy slots must share the same continuous-control model")
+            check((stage / "Meshes" / model.replace("\\", "/")).is_file(), "Missing shared model")
         if "offModel" in route: check((stage / "Meshes" / route["offModel"].replace("\\", "/")).is_file(), "Missing off effect")
         if route["type"] != "IPCT": check("duration" not in route and "originalDuration" not in route, "Non-IPCT route owns gameplay DATA")
     check(all(r["plugin"].lower() != "stellar impact.esp" for r in routes), "Owned form route remains")
@@ -102,7 +101,7 @@ def main(stage):
         category, filename = expected[layer["id"]]
         check(set(layer) == {"id", "category", "model", "duration"}, "Unexpected native layer field")
         check(layer["category"] == category and layer["model"].replace("\\", "/") ==
-              "StellarImpact/Runtime/B2D2S2/" + filename and layer["duration"] == .85,
+              "StellarImpact/" + filename and layer["duration"] == .85,
               "Native layer path/category/duration changed")
         check((stage / "Meshes" / layer["model"].replace("\\", "/")).is_file(), "Missing native layer model")
     sys.path.insert(0, str(Path(__file__).resolve().parent.parent / 'tools'))

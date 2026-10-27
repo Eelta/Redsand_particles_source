@@ -93,6 +93,7 @@ namespace
 	};
 	struct Stream
 	{
+        std::string enchantmentKey = "none";
 		Simulation simulation;
 		RE::ActorHandle actor = 0;
 		RE::ProjectileHandle projectile;
@@ -158,6 +159,9 @@ namespace
 		return stream;
 	}
 
+RedsandSettings::Config BowConfiguration(RE::Actor*) { return RedsandSettings::Get(); }
+RedsandSettings::Config StreamConfiguration(const Stream& stream, RedsandSettings::Config config) { RedsandSettings::ApplyBowAppearance(config, stream.enchantmentKey); return config; }
+float StreamDensity(const Stream& stream, float density) { const auto config = StreamConfiguration(stream, RedsandSettings::Get()); return config.enchantments.Find(stream.enchantmentKey) ? config.bowDensity : density; }
 #include "../source/BowArrowProcessing.inc"
 
 	void Check(bool condition, const char* message)
@@ -951,10 +955,36 @@ namespace
 	}
 
 
+    void IndependentCategorySurvivesDisabledMainBowSettings()
+    {
+        Reset();
+        ProcessArrow(Sample(1, 1), 1.f);
+        auto* stream = Find(1); Check(stream != nullptr, "category bow fixture missing");
+        stream->enchantmentKey = "fire";
+        auto config = RedsandSettings::Get();
+        config.bowEnabled = config.bowPlayer = config.bowNPC = false;
+        config.bowGathering = config.bowRings = config.bowTrails = false;
+        RedsandSettings::EnchantmentAppearance profile; profile.enabled = true; profile.bowRings = false; profile.bowDensity = .25f;
+        config.enchantments.Set("fire", profile);
+        ApplyStreamConfiguration(config, true, [](const Stream&) { return &actor; });
+        Check(Find(1) != nullptr && Count(*Find(1), Kind::Ring) == 0,
+            "disabled main page blocked category bow stream or category ring disable was ignored");
+        RedsandSettings::current = config;
+        auto later = Sample(1, 2); later.livingTime = .3f;
+        ProcessArrow(later, 0.f, false, false);
+        Check(Find(1) && Count(*Find(1), Kind::Trail) > 0 && Find(1)->enchantmentKey == "fire",
+            "in-flight category was replaced by main bow values on the next sample");
+        profile.bowEnabled = false; config.bowEnabled = config.bowPlayer = config.bowTrails = true;
+        config.enchantments.Set("fire", profile);
+        ApplyStreamConfiguration(config, true, [](const Stream&) { return &actor; });
+        Check(Find(1) == nullptr, "enabled main page resurrected a disabled category bow stream");
+    }
+
 }
 
 int main() try
 {
+        IndependentCategorySurvivesDisabledMainBowSettings();
 	FullBudgetKeepsAcceptingShotsAndDoesNotReplayEvictedArrows();
 	FailedSpawnRetriesWithoutCancellingTheNextDraw();
 	OlderWorkerSampleCannotCancelANewerDraw();

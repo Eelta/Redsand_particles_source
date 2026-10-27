@@ -80,8 +80,9 @@ int main()
 		if (std::abs(output - 1197.f) > .001f) { throw std::runtime_error("cached curve output accumulated density"); }
 	}
     Config unit;
-    if (unit.impactBrightness != 1.f || unit.impactDensity != 1.f || unit.cutLength != 1.f || unit.slashDistance != 1.f || unit.slashSpread != 1.f || unit.slashDensity != 1.f) { throw std::runtime_error("unit defaults lost"); }
-    if (SlashSpeed(430.f, unit) != 8600.f || SlashDensity(unit) != 100.f || std::abs(SlashSpread(.075f, unit) - .075f * .65f * .2f) > 1e-6f) { throw std::runtime_error("captured travel/count/spread not preserved at 1x"); }
+    if (unit.impactBrightness != 1.f || unit.impactDensity != .1f || unit.cutLength != 1.f || unit.slashDistance != .1f || unit.slashSpread != 0.f || unit.slashDensity != 0.f) { throw std::runtime_error("unit defaults lost"); }
+    if (SlashSpeed(430.f, unit) != 860.f || SlashDensity(unit) != 0.f || SlashSpread(.075f, unit) != 0.f) { throw std::runtime_error("captured travel/count/spread not preserved at 1x"); }
+    unit.slashDensity = 1.f;
     for (float global : { 0.f, .1f, .5f, 1.f, 2.f, 10.f }) {
         unit.impactDensity = global;
         const auto oldCapturedCount = std::min(global * 10.f, 10.f) * 10.f;
@@ -91,7 +92,7 @@ int main()
     unit.slashSpread=0.f;
     if (SlashSpread(.18f, unit) != 0.f) { throw std::runtime_error("straight-line spray retained angular spread"); }
     unit.slashDensity=.18f; unit.impactDensity=2.85f;
-    if (std::abs(SlashDensity(unit)-51.3f)>1e-4f || unit.slashDistance!=1.f) { throw std::runtime_error("independent slash count ignored fractional values or changed travel"); }
+    if (std::abs(SlashDensity(unit)-51.3f)>1e-4f || unit.slashDistance!=.1f) { throw std::runtime_error("independent slash count ignored fractional values or changed travel"); }
     unit.slashDensity=maxSlashDensity; unit.impactDensity=maxDensity;
     if (SlashDensity(unit)!=100.f) { throw std::runtime_error("documented combined count cap failed"); }
     if (maxSlashDensity != 1.f) { throw std::runtime_error("slash quantity range increased the established absolute limit"); }

@@ -1,6 +1,6 @@
 bool Allowed(RE::Actor* actor)
 		{
-			const auto configuration = RedsandSettings::Get();
+			const auto configuration = BowConfiguration(actor);
 			const bool allowed = actor && actor->Is3DLoaded() && !actor->IsDead() && configuration.bowEnabled &&
 				(actor->IsPlayerRef() ? configuration.bowPlayer : configuration.bowNPC);
 			if (configuration.diagnostics && actor) {
@@ -90,6 +90,10 @@ bool Allowed(RE::Actor* actor)
 				if (!candidate->charging && candidate->projectile == sample.handle) { stream = candidate.get(); break; }
 			}
 			if (stream && !stream->emitting) { return; }
+			if (stream) {
+				const auto current = StreamConfiguration(*stream, RedsandSettings::Get());
+				density = current.bowDensity; rings = current.bowRings; trails = current.bowTrails;
+			}
 			if (!stream) {
 
 				const bool firstStream = !shot->second.streamCreated;
@@ -127,11 +131,11 @@ bool Allowed(RE::Actor* actor)
 				shot->second.rendererResident = true;
 				if (chargedColor) { stream->color = *chargedColor; }
 				stream->projectile = sample.handle;
-				if (firstStream && rings && sample.livingTime <= 0.25f) { stream->simulation.Ring(origin, sample.direction, density, sample.power); }
+				if (firstStream && rings && sample.livingTime <= 0.25f) { stream->simulation.Ring(origin, sample.direction, StreamDensity(*stream, density), sample.power); }
 			}
 			if (trails) {
-				if (sample.path.Size()) { stream->simulation.Trail(sample.path, density); }
-				else { stream->simulation.Trail(sample.from, sample.to, sample.delta, density, sample.continuous); }
+				if (sample.path.Size()) { stream->simulation.Trail(sample.path, StreamDensity(*stream, density)); }
+				else { stream->simulation.Trail(sample.from, sample.to, sample.delta, StreamDensity(*stream, density), sample.continuous); }
 			}
 			stream->silence = 0.f;
 			if (!sample.flying) { stream->Stop(); }
@@ -151,14 +155,15 @@ bool Allowed(RE::Actor* actor)
 		{
 			std::erase_if(streams, [&](auto& stream) {
 				auto actor = actorForStream(*stream);
-				const bool inScope = actor && (actor->IsPlayerRef() ? configuration.bowPlayer : configuration.bowNPC);
-				if (!display || !configuration.bowEnabled || !inScope || (stream->charging && !configuration.bowGathering) ||
-					(!stream->charging && !configuration.bowRings && !configuration.bowTrails)) {
+				const auto current = StreamConfiguration(*stream, configuration);
+				const bool inScope = actor && (actor->IsPlayerRef() ? current.bowPlayer : current.bowNPC);
+				if (!display || !current.bowEnabled || !inScope || (stream->charging && !current.bowGathering) ||
+					(!stream->charging && !current.bowRings && !current.bowTrails)) {
 					RecoverableStreamLoss(*stream);
 					stream->Retire();
 					return true;
 				}
-				stream->simulation.SetEnabledKinds(configuration.bowGathering, configuration.bowRings, configuration.bowTrails);
+				stream->simulation.SetEnabledKinds(current.bowGathering, current.bowRings, current.bowTrails);
 				return false;
 			});
 		}

@@ -2,14 +2,14 @@
 param([switch]$Apply)
 $ErrorActionPreference='Stop'
 $taskRoot=(Resolve-Path -LiteralPath $PSScriptRoot).ProviderPath.TrimEnd('\')
-foreach($taskRequired in @('Build.ps1','source\RedsandSettings.h','output\Redsand Particles.zip','output\BUILD.json')) {
+foreach($taskRequired in @('Build.ps1','source\RedsandSettings.h','output\Redsand Particles.zip')) {
  if(-not (Test-Path -LiteralPath (Join-Path $taskRoot $taskRequired))){throw "Missing current workspace file: $taskRequired"}
 }
-$taskKeep=@('Redsand Particles.zip','Redsand Particles - Installer.zip','Redsand Particles - Corresponding Source.zip','BUILD.json','weapon-particle-styles.png','Precision.pdb','Publication','BuildData')
+$taskKeep=@('Redsand Particles.zip')
 $taskPreserved=@{}
 foreach($taskName in $taskKeep){$taskPath=Join-Path $taskRoot ('output\'+$taskName);if(Test-Path -LiteralPath $taskPath -PathType Leaf){$taskPreserved[$taskPath]=(Get-FileHash -LiteralPath $taskPath).Hash}}
 $taskTargets=@()
-foreach($taskName in @('.build','backups','build','tools\__pycache__','tests\__pycache__')){ $taskPath=Join-Path $taskRoot $taskName;if(Test-Path -LiteralPath $taskPath){$taskTargets+=Get-Item -LiteralPath $taskPath -Force} }
+foreach($taskName in @('.build','backups','recovery','build','tools\__pycache__','tests\__pycache__')){ $taskPath=Join-Path $taskRoot $taskName;if(Test-Path -LiteralPath $taskPath){$taskTargets+=Get-Item -LiteralPath $taskPath -Force} }
 $taskTargets+=@(Get-ChildItem -LiteralPath (Join-Path $taskRoot 'output') -Force | Where-Object Name -NotIn $taskKeep)
 foreach($taskItem in $taskTargets){
  $taskResolved=(Resolve-Path -LiteralPath $taskItem.FullName).ProviderPath.TrimEnd('\')

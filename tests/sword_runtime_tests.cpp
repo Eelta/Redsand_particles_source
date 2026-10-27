@@ -173,6 +173,8 @@ namespace RE
 	}
 }
 
+namespace RedsandEnchantmentProfiles { template <class E, class A> std::string Key(E*, A*, bool) { return "none"; } }
+
 namespace Redsand::Weapons
 {
 	Profile ForWeapon(RE::TESObjectWEAP* weapon)
@@ -478,7 +480,7 @@ namespace
 		RedsandSettings::Config redsandConfig;
 		Profile redsandWeaponProfile = Profile::Default;
 		bool redsandLegacyTrail = false, redsandActorIsPlayer = false, redsandScopeAllowed = false;
-		bool redsandNativeOnly = false, redsandParticleSelected = false;
+		bool redsandNativeOnly = false, redsandParticleSelected = false, redsandReleasedSelected = false;
 		std::optional<RE::NiColorA> baseColorOverride;
 		std::string Select(const RedsandSettings::Config& config, RE::Actor* actor, RE::TESObjectWEAP* weapon,
 			std::string_view requested, std::string_view installedRibbon)
@@ -490,6 +492,8 @@ namespace
 			const Handle a_actorHandle{ actor };
 			RE::InventoryEntryData entry{ weapon };
 			auto* a_weaponItem = &entry;
+            bool a_bIsLeftHand = false;
+            std::string redsandEnchantmentKey, redsandEnchantmentFallback;
 			baseColorOverride.reset();
 #include "../source/TrailActorStyle.inc"
 			std::string trailMeshPath = redsandLegacyTrail ? Settings::attackTrailMeshPath : "RedsandParticles/Default.nif";
@@ -499,8 +503,9 @@ namespace
 		}
 	};
 
-	void ConstructorScopeCannotReenterParticlesThroughMeshOverrides()
+	void ConstructorScopeCannotReenterParticlesThroughMeshOverrides(bool released)
 	{
+		RedsandLog::informationLogs = 0;
 		using Redsand::Weapons::IsParticleMesh;
 		using Redsand::Weapons::ResolveMeleeMesh;
 		constexpr auto own = "RedsandParticles/Default.nif";
@@ -520,6 +525,7 @@ namespace
 				for (const bool players : { false, true }) {
 					for (const bool npcs : { false, true }) {
 						auto config = RedsandSettings::Config{};
+						config.swordReleasedTrail = released;
 						config.swordEnabled = enabled;
 						config.swordPlayer = players;
 						config.swordNPC = npcs;
@@ -530,6 +536,8 @@ namespace
 							Check(fixture.redsandScopeAllowed == allowed && fixture.redsandLegacyTrail != allowed && fixture.redsandActorIsPlayer == player,
 								"constructor did not snapshot the player/NPC scope correctly");
 							Check(IsParticleMesh(selected) == allowed, "direct/TOML particle override bypassed constructor scope before Spawn");
+							Check(fixture.redsandReleasedSelected == (allowed && released), "Redsand mode bypassed constructor scope or ignored its switch");
+							Check((selected == "RedsandSwingTrail/Arc.nif") == (allowed && released), "Redsand replacement did not match the effective mode and scope");
 							if (allowed) { Check(fixture.baseColorOverride && fixture.baseColorOverride->blue == .650f &&
 								fixture.baseColorOverride->red == .025f, "unenchanted primary lost its original blue default"); }
 							if (!allowed) {
@@ -541,6 +549,7 @@ namespace
 						ScopeFixture fixture;
 						Check(fixture.Select(config, &actor, &weapon, customRibbon, own) == customRibbon,
 							"scope selection changed another mod's explicit ribbon");
+						Check(!fixture.redsandReleasedSelected, "external ribbon entered the Redsand simulation branch");
 						Check(IsParticleMesh(fixture.Select(config, &actor, &weapon, "", own)) == allowed,
 							"the configured default particle mesh bypassed scope without a direct override");
 					}
@@ -581,6 +590,7 @@ namespace
 		Check(ResolveMeleeMesh(false, own, "mEsHeS\\eFfEcTs\\wEaPoNtRaIlS\\eLeMeNtAlDeSeRt\\Blue.nif") == hardRibbon,
 			"installed own fallback did not honor Windows case/slash variants");
 		Check(RedsandLog::informationLogs == 0, "disabled diagnostics emitted constructor logs");
+		if (released) { return; }
 		auto diagnostics = RedsandSettings::Config{};
 		diagnostics.diagnostics = true;
 		RE::Actor npc;
@@ -590,6 +600,32 @@ namespace
 		traced.Select(diagnostics, &npc, &weapon, own, customRibbon);
 		Check(RedsandLog::informationLogs == 3, "scope diagnostics did not log once per construction or repeated the profile report");
 	}
+    void IndependentCategoryOverridesConstructorScope()
+    {
+        ScopeFixture fixture;
+        RE::Actor actor; actor.player = true;
+        RE::TESObjectWEAP weapon;
+        RedsandSettings::Config config; config.swordEnabled = false; config.swordPlayer = false; config.swordBrightness = 0.f;
+        RedsandSettings::EnchantmentAppearance profile; profile.enabled = true; profile.brightness = 4.f;
+        config.enchantments.Set("none", profile);
+        fixture.Select(config, &actor, &weapon, "", "Effects/WeaponTrails/AttackTrail.nif");
+        Check(fixture.redsandScopeAllowed && !fixture.redsandLegacyTrail && fixture.redsandConfig.swordBrightness == 4.f,
+            "category was blocked by disabled main melee scope before Spawn");
+        Check(fixture.redsandReleasedSelected, "enabled category lost the default Redsand replacement");
+        config.swordReleasedTrail = false;
+        fixture.Select(config, &actor, &weapon, "", "Effects/WeaponTrails/AttackTrail.nif");
+        Check(fixture.redsandReleasedSelected, "main mode switch overrode the independent category");
+        profile.swordReleasedTrail = false; config.swordReleasedTrail = true; config.enchantments.Set("none", profile);
+        fixture.Select(config, &actor, &weapon, "", "Effects/WeaponTrails/AttackTrail.nif");
+        Check(!fixture.redsandReleasedSelected, "category mode disable was overridden by the main mode switch");
+        profile.swordReleasedTrail = true; config.enchantments.Set("none", profile);
+        const auto external = fixture.Select(config, &actor, &weapon, "Custom/Ribbon.nif", "RedsandParticles/Default.nif");
+        Check(external == "Custom/Ribbon.nif" && !fixture.redsandReleasedSelected, "independent category took ownership of an external mesh");
+        profile.swordEnabled = false; config.swordEnabled = true; config.swordPlayer = true; config.enchantments.Set("none", profile);
+        fixture.Select(config, &actor, &weapon, "", "Effects/WeaponTrails/AttackTrail.nif");
+        Check(!fixture.redsandScopeAllowed && fixture.redsandLegacyTrail, "category disable was overridden by main melee enable");
+    }
+
 }
 
 int main()
@@ -602,7 +638,9 @@ int main()
 		LegacyRibbonsRemainUntouched();
 		LiveSpreadNarrowsWidthWithoutMovingTheSweep();
 		LiveScalarValuesAlwaysUseAuthoredConstants();
-		ConstructorScopeCannotReenterParticlesThroughMeshOverrides();
+		ConstructorScopeCannotReenterParticlesThroughMeshOverrides(false);
+		ConstructorScopeCannotReenterParticlesThroughMeshOverrides(true);
+        IndependentCategoryOverridesConstructorScope();
 		std::cout << "PASS: legacy/converted source discovery, consecutive tip sweep, discontinuity resets, category endpoints, scene propagation and legacy isolation\n";
 		return 0;
 	} catch (const std::exception& exception) {

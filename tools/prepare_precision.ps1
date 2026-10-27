@@ -83,8 +83,8 @@ function Replace-One([string]$Content, [string]$Before, [string]$After) {
     $cpp = Replace-One $cpp 'TrailDefinition& a_outTrailDefinition) const' 'TrailDefinition& a_outTrailDefinition, bool a_ribbonColor) const'
     $header = Replace-One $header 'TrailDefinition& a_outTrailDefinition) const' 'TrailDefinition& a_outTrailDefinition, bool a_ribbonColor = false) const'
     $anchor = 'bool AttackTrail::GetTrailDefinition('
-    $cpp = Replace-One $cpp $anchor ((Text (Join-Path $SourceRoot 'source/ParticleDrain.cpp.inc')) + (Text (Join-Path $SourceRoot 'source/ParticleDiagnostics.cpp.inc')) + (Text (Join-Path $SourceRoot 'source/SwordRuntime.inc')) + $anchor)
-    $header = Replace-One $header '#include "Settings.h"' "#include `"Settings.h`"`n#include `"RedsandDrainState.h`"`n#include `"RedsandSettings.h`"`n#include `"RedsandMaterialColor.h`"`n#include `"RedsandLog.h`"`n#include `"RedsandMeleeStyle.h`"`n#include `"RedsandEmissionTuning.h`"`n#include `"RE/N/NiPSysGravityModifier.h`"`n#include `"RE/N/NiFloatInterpolator.h`""
+    $cpp = Replace-One $cpp $anchor ((Text (Join-Path $SourceRoot 'source/SwingTrailRuntime.inc')) + (Text (Join-Path $SourceRoot 'source/ParticleDrain.cpp.inc')) + (Text (Join-Path $SourceRoot 'source/ParticleDiagnostics.cpp.inc')) + (Text (Join-Path $SourceRoot 'source/SwordRuntime.inc')) + $anchor)
+    $header = Replace-One $header '#include "Settings.h"' "#include `"Settings.h`"`n#include `"RedsandDrainState.h`"`n#include `"RedsandSwingTrail.h`"`n#include `"RedsandSettings.h`"`n#include `"RedsandMaterialColor.h`"`n#include `"RedsandLog.h`"`n#include `"RedsandMeleeStyle.h`"`n#include `"RedsandEnchantmentProfiles.h`"`n#include `"RedsandEmissionTuning.h`"`n#include `"RE/N/NiPSysGravityModifier.h`"`n#include `"RE/N/NiFloatInterpolator.h`""
     $header = Replace-One $header "private:`n" ("private:`n" + (Text (Join-Path $SourceRoot 'source/TrailMembers.inc')))
     Save $cppPath $cpp
     Save $headerPath $header
@@ -129,11 +129,11 @@ function Replace-One([string]$Content, [string]$Before, [string]$After) {
     $pending = Replace-One $pending "void PendingHit::Run()`n{" "void PendingHit::Run()`n{`n`tRedsandSlashRandom::AttackScope randomSlashAttack(attackCollision ? attackCollision->redsandSlashSeed : 0u);"
     Save $pendingPath $pending
     $nativeFiles = @(
-        'RedsandDrainState.h', 'RedsandHavokLayout.h',
+        'RedsandSwingTrail.h', 'RedsandDrainState.h', 'RedsandHavokLayout.h',
         'RedsandBowParticles.h', 'RedsandBowParticles.cpp', 'RedsandBowSimulation.h',
         'RedsandBowChargeState.h', 'RedsandBowEventState.h', 'RedsandBowStreamBudget.h',
         'BowGraphSnapshot.inc', 'BowArrowProcessing.inc', 'BowRenderer.inc', 'BowMotionDiagnostics.inc', 'RedsandMotionTrace.h',
-        'RedsandSettings.h', 'RedsandSettings.cpp', 'RedsandLog.h', 'RedsandLog.cpp', 'RedsandMenu.h', 'RedsandMenu.cpp',
+        'RedsandEnchantmentProfiles.h', 'RedsandEnchantmentProfiles.cpp', 'RedsandSettings.h', 'RedsandSettings.cpp', 'RedsandLog.h', 'RedsandLog.cpp', 'RedsandMenu.h', 'RedsandMenu.cpp',
         'RedsandBlockLightning.h', 'RedsandBlockLightning.cpp', 'RedsandBlockLightningPolicy.h', 'RedsandImpactVFX.h', 'RedsandImpactVFX.cpp', 'RedsandImpactRouting.h', 'RedsandImpactManifest.h', 'RedsandSlashFrame.h',
         'RedsandAppearancePolicy.h', 'RedsandLiveAppearance.cpp', 'RedsandSlashRandom.h', 'RedsandMaterialColor.h', 'RedsandUpdateScope.h', 'SlashEmitterControls.inc',
         'RedsandWeaponProfiles.h', 'RedsandWeaponProfiles.cpp', 'RedsandMeleeStyle.h', 'RedsandEmissionTuning.h'

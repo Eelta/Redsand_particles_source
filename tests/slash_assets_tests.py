@@ -13,12 +13,12 @@ from optimize_slash_assets import SlashNif, closure, compact, graph_signature, S
 
 
 class SlashAssetsTests(unittest.TestCase):
-    def test_all_presets_preserve_artwork_motion_fade_and_core_emission(self):
+    def test_shared_model_preserves_artwork_motion_fade_and_core_emission(self):
         golden = json.loads((ROOT / 'tests/fixtures/slash-pre-optimization-graphs.json').read_text('utf-8'))
         assets = ROOT / 'assets/ImpactVFX/Meshes/StellarImpact'
         current = {p.relative_to(assets).as_posix(): p for p in assets.rglob('GoldBladeSlash.nif')}
         self.assertEqual(set(current), set(golden))
-        self.assertEqual(len(current), 65)
+        self.assertEqual(len(current), 1)
         for name, path in current.items():
             with self.subTest(model=name):
                 doc = SlashNif.read(path)

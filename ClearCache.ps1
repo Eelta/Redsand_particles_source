@@ -15,4 +15,4 @@ foreach($taskItem in @((Get-Item -LiteralPath $taskCache -Force)) + @(Get-ChildI
  if($taskItem.Attributes -band [IO.FileAttributes]::ReparsePoint){throw "Linked cache item is not supported: $taskPath"}
 }
 Remove-Item -LiteralPath $taskCache -Recurse -Force
-Write-Output 'Only the Redsand cache was deleted. Source, output, recovery and installed mod were preserved.'
+Write-Output 'Only the Redsand cache was deleted. Current source, output and installed mod were preserved.'

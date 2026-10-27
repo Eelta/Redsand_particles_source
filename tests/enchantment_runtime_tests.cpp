@@ -50,10 +50,12 @@ struct TrailDefinition { Override trailOverride; };
 Magic* GetPoison(Weapon* weapon) { return weapon->poison; }
 Magic* GetEnchantment(Weapon* weapon) { return weapon->magic; }
 RE::ActorValue GetActorValueForCost(Magic*, RE::MagicSystem::CastingSource) { return RE::ActorValue::kCharge; }
-struct Result { std::optional<RE::NiColorA> color; std::string source; float suppliedLifetime; };
+namespace RedsandEnchantmentProfiles { std::string Key(Magic* magic) { return magic ? "fire" : "none"; } }
+struct Result { std::optional<RE::NiColorA> color; std::string source; float suppliedLifetime; RedsandSettings::Config config; std::string key, fallback; };
 struct Runtime {
     std::optional<RE::NiColorA> ownRule;
     std::optional<RE::NiColorA> compatibleRule;
+    RedsandSettings::Config config;
     unsigned ruleQueries = 0;
     unsigned compatibleQueries = 0;
     bool GetTrailDefinition(int, Weapon*, bool, TrailDefinition& rule, bool ordinary = false) {
@@ -65,10 +67,12 @@ struct Runtime {
         int a_actorHandle = 0;
         auto redsandActor = std::make_shared<Actor>(); redsandActor->charge = charge;
         Weapon* redsandWeapon = a_weaponItem;
-        RedsandSettings::Config redsandConfig;
+        RedsandSettings::Config redsandConfig = config;
+        std::string redsandEnchantmentKey = !a_weaponItem || (!a_weaponItem->magic && !a_weaponItem->poison) || (charge < 163.f && !a_weaponItem->poison) ? "none" : "fire", redsandEnchantmentFallback;
+        RedsandSettings::ApplyMeleeAppearance(redsandConfig, redsandEnchantmentKey, "");
         auto baseColorOverride = a_trailOverride ? a_trailOverride->baseColorOverride : std::optional<RE::NiColorA>{};
 #include "../source/TrailEnchantment.inc"
-        return {baseColorOverride, std::string(redsandColorSource), a_trailOverride ? a_trailOverride->lifetime : 1.f};
+        return {baseColorOverride, std::string(redsandColorSource), a_trailOverride ? a_trailOverride->lifetime : 1.f, redsandConfig, redsandEnchantmentKey, redsandEnchantmentFallback};
     }
 };
 void Check(bool ok, const char* message) { if (!ok) { throw std::runtime_error(message); } }
@@ -130,6 +134,23 @@ int main()
         const auto queries = runtime.compatibleQueries;
         result = runtime.Resolve(&weapon, supplied, true);
         Check(!result.color && runtime.compatibleQueries == queries, "particle fallback changed or queried companion ribbon color");
+        runtime.ownRule.reset(); runtime.compatibleRule.reset();
+        RedsandSettings::EnchantmentAppearance appearance;
+        appearance.enabled = true; appearance.color.custom = true; appearance.color.rgb = {1.f, .1f, .2f}; appearance.brightness = 3.f; appearance.density = 0.f;
+        runtime.config.enchantments.Set("fire", appearance);
+        result = runtime.Resolve(&weapon);
+        Check(result.config.swordBrightness == 3.f && result.config.swordDensity == 0.f && result.config.colors[0].rgb[0] == 1.f,
+            "exact enchantment profile did not reach production melee settings");
+        runtime.config.enchantments.Set("unknown", appearance);
+        appearance.brightness = 2.f; runtime.config.enchantments.Set("none", appearance);
+        result = runtime.Resolve(&weapon, {}, false, 0.f);
+        Check(result.config.swordBrightness == 2.f && result.key == "none", "depleted profile mixed with active enchantment");
+        result = runtime.Resolve(&weapon, {}, true);
+        Check(!result.color, "profile recolored companion ribbon");
+        weapon.magic = nullptr;
+        appearance.brightness = 4.f; runtime.config.enchantments.Set("none", appearance);
+        result = runtime.Resolve(&weapon);
+        Check(result.config.swordBrightness == 4.f && result.key == "none", "unenchanted fallback was ignored");
         std::cout << "Actual TrailEnchantment fragment: API palette fill, three effects, neutral masks, direct keywords, explicit white, depletion and companion isolation passed\n";
     } catch (const std::exception& e) { std::cerr << e.what() << '\n'; return 1; }
 }
