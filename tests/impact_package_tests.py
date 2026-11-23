@@ -51,10 +51,10 @@ def nif(data):
 def main(stage):
     nif_paths = list((stage / "Meshes/StellarImpact").rglob("*.nif"))
     families = ["Hit/StoneBurst.nif", "Hit/MetalBurst.nif", "Slash/AzureCrescentSlash.nif", "Slash/GoldBladeSlash.nif",
-                "Block/NormalBlock.nif", "Block/TimedSparks.nif", "Block/TimedFlare.nif", "Block/PerfectRing.nif", "Block/SimpleTimed.nif", "Refraction/SoftRefraction.nif"]
+                "Block/NormalBlock.nif", "Block/TimedSparks.nif", "Block/TimedFlare.nif", "Block/PerfectRing.nif", "Block/SimpleTimed.nif"]
     expected_nifs = {"Block/StarRing.nif"} | set(families)
     check({p.relative_to(stage / "Meshes/StellarImpact").as_posix() for p in nif_paths} == expected_nifs,
-          "Expected ten shared base models and one private star-ring model; legacy preset copies must be omitted")
+          "Expected nine shared base models and one private star-ring model; legacy preset copies must be omitted")
     texture_refs = set()
     for path in nif_paths:
         data = path.read_bytes(); types = nif(data)
@@ -92,11 +92,10 @@ def main(stage):
         if route["type"] != "IPCT": check("duration" not in route and "originalDuration" not in route, "Non-IPCT route owns gameplay DATA")
     check(all(r["plugin"].lower() != "stellar impact.esp" for r in routes), "Owned form route remains")
     native = document["Native"]
-    check(len(native) == 5 and {r["id"] for r in native} == {"Hit", "Stone", "Slash", "Block", "Wave"},
+    check(len(native) == 4 and {r["id"] for r in native} == {"Hit", "Stone", "Slash", "Block"},
           "Missing native effect layer")
     expected = {"Hit": ("Hit", "Hit/MetalBurst.nif"), "Stone": ("Hit", "Hit/StoneBurst.nif"),
-                "Slash": ("Slash", "Slash/GoldBladeSlash.nif"), "Block": ("Block", "Block/NormalBlock.nif"),
-                "Wave": ("Hit", "Refraction/SoftRefraction.nif")}
+                "Slash": ("Slash", "Slash/GoldBladeSlash.nif"), "Block": ("Block", "Block/NormalBlock.nif")}
     for layer in native:
         category, filename = expected[layer["id"]]
         check(set(layer) == {"id", "category", "model", "duration"}, "Unexpected native layer field")
@@ -109,7 +108,7 @@ def main(stage):
     files = {p.relative_to(stage).as_posix() for p in stage.rglob('*') if p.is_file()}
     check(all(is_runtime_file(name) for name in files), "External module or non-runtime file remains")
     check({name for name in files if name.endswith('.dll')} <= {'SKSE/Plugins/Precision.dll'}, "Bundled combat DLL remains")
-    print(f"PASS: ImpactVFX package: {len(nif_paths)} NIFs, {len(textures)} DDS, 26 vanilla routes, five native layers, zero plugins/audio")
+    print(f"PASS: ImpactVFX package: {len(nif_paths)} NIFs, {len(textures)} DDS, 26 vanilla routes, four native layers, zero plugins/audio")
 
 
 if __name__ == "__main__": main(Path(sys.argv[1]))

@@ -11,6 +11,7 @@
 #include <locale>
 #include <limits>
 #include <mutex>
+#include <optional>
 #include <string>
 #include <string_view>
 
@@ -69,10 +70,12 @@ namespace RedsandSettings
 			config.impactBrightness = valid(config.impactBrightness, maxBrightness);
 			config.impactDensity = valid(config.impactDensity, maxDensity);
 			config.impactSize = valid(config.impactSize, maxSize, minSize);
+			config.hitBrightness = valid(config.hitBrightness, maxBrightness);
+			config.hitDensity = valid(config.hitDensity, maxDensity, 0.f, .1f);
+			config.hitSize = valid(config.hitSize, maxSize, minSize);
+			config.cutBrightness = valid(config.cutBrightness, maxBrightness);
 			config.cutLength = valid(config.cutLength, maxCutLength, minCutLength);
-			config.slashDistance = valid(config.slashDistance, maxSlashDistance, minSlashDistance, defaultSlashDistance);
-			config.slashSpread = valid(config.slashSpread, maxSlashSpread, 0.f, 0.f);
-			config.slashDensity = valid(config.slashDensity, maxSlashDensity, 0.f, 0.f);
+			config.cutWidth = valid(config.cutWidth, maxCutWidth, minCutWidth);
 			config.slashRandomRange = valid(config.slashRandomRange, 1.f, 0.f, .5f);
             config.blockLightningChance = valid(config.blockLightningChance, 1.f, 0.f, .1f);
             config.blockLightningBrightness = valid(config.blockLightningBrightness, maxBrightness);
@@ -133,12 +136,23 @@ namespace RedsandSettings
 			else if (lower == "false" || lower == "0" || lower == "no" || lower == "off") { output = false; }
 		}
 
+		std::optional<float> ParseFloat(std::string_view value)
+		{
+			if (value.empty()) { return {}; }
+			float result = 0.f;
+			const auto parsed = std::from_chars(value.data(), value.data() + value.size(), result);
+			if (parsed.ec == std::errc{} && parsed.ptr == value.data() + value.size() && std::isfinite(result)) { return result; }
+			return {};
+		}
+
 		void ReadFloat(std::string_view value, float& output)
 		{
-			if (value.empty()) { return; }
-			float result = 1.0f;
-			const auto parsed = std::from_chars(value.data(), value.data() + value.size(), result);
-			if (parsed.ec == std::errc{} && parsed.ptr == value.data() + value.size() && std::isfinite(result)) { output = result; }
+			if (const auto parsed = ParseFloat(value)) { output = *parsed; }
+		}
+
+		void ReadFloat(std::string_view value, std::optional<float>& output)
+		{
+			if (const auto parsed = ParseFloat(value)) { output = parsed; }
 		}
 
 		void ReadLevel(std::string_view value, float& output, const std::array<float, 4>& levels)
@@ -161,6 +175,7 @@ namespace RedsandSettings
 		Config Read(std::istream& input)
 		{
 			Config result;
+			std::optional<float> hitBrightness, hitDensity, hitSize, cutBrightness;
 			std::string section, line;
 			while (std::getline(input, line)) {
 				auto text = Trim(line);
@@ -224,10 +239,12 @@ namespace RedsandSettings
 					else if (key == "brightness") { ReadFloat(value, result.impactBrightness); }
 					else if (key == "density") { ReadFloat(value, result.impactDensity); }
 					else if (key == "size") { ReadFloat(value, result.impactSize); }
+					else if (key == "hitbrightness") { ReadFloat(value, hitBrightness); }
+					else if (key == "hitdensity") { ReadFloat(value, hitDensity); }
+					else if (key == "hitsize") { ReadFloat(value, hitSize); }
+					else if (key == "cutbrightness") { ReadFloat(value, cutBrightness); }
 					else if (key == "cutlength") { ReadFloat(value, result.cutLength); }
-					else if (key == "slashdistance") { ReadFloat(value, result.slashDistance); }
-					else if (key == "slashspread") { ReadFloat(value, result.slashSpread); }
-					else if (key == "slashdensity") { ReadFloat(value, result.slashDensity); }
+					else if (key == "cutwidth") { ReadFloat(value, result.cutWidth); }
                 } else if (section == "blocklightning") {
                     if (key == "enabled") { ReadBool(value, result.blockLightning); }
                     else if (key == "randomtrigger") { ReadBool(value, result.blockLightningRandomTrigger); }
@@ -288,6 +305,10 @@ namespace RedsandSettings
 					}
 				}
 			}
+			result.hitBrightness = hitBrightness.value_or(result.impactBrightness);
+			result.hitDensity = hitDensity.value_or(result.impactDensity);
+			result.hitSize = hitSize.value_or(result.impactSize);
+			result.cutBrightness = cutBrightness.value_or(result.impactBrightness);
 			return Normalize(result);
 		}
 
@@ -308,7 +329,6 @@ namespace RedsandSettings
 					<< "; Redsand Particles: menu changes take effect immediately.\n"
 					<< "; Brightness: 0..20. Density: 0..10. 1 is the default multiplier.\n"
 					<< "; Melee spread: 0..10. Size: 0.05..10. Cut length: 0.05..20.\n"
-					<< "; Slash count: 0..1. Unit count retains the previous absolute particle limit.\n"
 					<< "[Menu]\nLanguage=" << (config.language == Language::Chinese ? "Chinese" : "English") << '\n'
 					<< "DiagnosticLogging=" << config.diagnostics << "\n\n"
 					<< "[SwordParticles]\n"
@@ -351,10 +371,12 @@ namespace RedsandSettings
 					<< "Brightness=" << config.impactBrightness << '\n'
 					<< "Density=" << config.impactDensity << '\n'
 					<< "Size=" << config.impactSize << '\n'
+					<< "HitBrightness=" << config.hitBrightness << '\n'
+					<< "HitDensity=" << config.hitDensity << '\n'
+					<< "HitSize=" << config.hitSize << '\n'
+					<< "CutBrightness=" << config.cutBrightness << '\n'
 					<< "CutLength=" << config.cutLength << '\n'
-					<< "SlashDistance=" << config.slashDistance << '\n'
-					<< "SlashSpread=" << config.slashSpread << '\n'
-					<< "SlashDensity=" << config.slashDensity << '\n';
+					<< "CutWidth=" << config.cutWidth << '\n';
                 output << "\n; Player successful blocks only. Adds visuals; never changes time or block behavior.\n"
                     << "[BlockLightning]\nEnabled=" << config.blockLightning << '\n'
                     << "RandomTrigger=" << config.blockLightningRandomTrigger << '\n'

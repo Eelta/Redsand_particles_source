@@ -3,10 +3,28 @@
 #include "RedsandSettings.h"
 
 #include <algorithm>
+#include <cmath>
 
 namespace Redsand::Emission
 {
 	enum class Scalar { BirthRate, Speed, Radius };
+
+	struct RadiusRange
+	{
+		float initial;
+		float variation;
+
+		bool Matches(float controllerRadius) const
+		{
+			return initial == controllerRadius && std::isfinite(initial) && initial > 0.f &&
+				variation >= 0.f && variation <= initial;
+		}
+
+		RadiusRange Scaled(float size) const
+		{
+			return { initial * size, variation * size };
+		}
+	};
 
 	inline float Value(float original, Scalar kind, const RedsandSettings::Config& config)
 	{

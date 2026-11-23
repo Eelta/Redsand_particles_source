@@ -122,21 +122,19 @@ Require ($installed.ContainsKey('SKSE\Plugins\Precision.dll')) 'Required game fi
 $settings = ReadSettings (StageFile 'SKSE\Plugins\RedsandParticles.ini')
 $defaults = @{
     Menu = @{ Language='English'; DiagnosticLogging='false' }
-    SwordParticles = @{ Enabled='true'; Player='true'; NPC='true'; Tip='true'; KeepPrecisionTrail='true'; ReleasedTrail='true'; RibbonLifetime='0.2'; ParticleLifetime='0.3'; RibbonWidth='0.5'; TrailMomentum='0.1'; RibbonFadeOut='0.25'; ParticleFadeOut='0.4'; ParticleGravity='0.3'; Brightness='1'; Density='1'; Spread='1'; Size='1' }
+    SwordParticles = @{ Enabled='true'; Player='true'; NPC='true'; Tip='true'; KeepPrecisionTrail='true'; ReleasedTrail='false'; RibbonLifetime='0.2'; ParticleLifetime='0.3'; RibbonWidth='0.5'; TrailMomentum='0.1'; RibbonFadeOut='0.25'; ParticleFadeOut='0.4'; ParticleGravity='0.3'; Brightness='1'; Density='1'; Spread='1'; Size='1' }
     BowParticles = @{ Enabled='true'; Player='true'; NPC='true'; Brightness='1'; Density='1'; Gathering='true'; Rings='true'; Trails='true' }
-    ImpactVFX = @{ Enabled='true'; Hit='true'; Slash='true'; RandomSlashColor='false'; RandomSlashValues='false'; RandomSlashRange='0.5'; Block='true'; BlockStyle='0'; Brightness='1'; Density='0.1'; Size='1'; SlashDistance='0.1'; SlashSpread='0'; SlashDensity='0'; CutLength='1' }
+    ImpactVFX = @{ Enabled='true'; Hit='true'; Slash='true'; RandomSlashColor='false'; RandomSlashValues='false'; RandomSlashRange='0.5'; Block='true'; BlockStyle='0'; Brightness='1'; Density='0.1'; Size='1'; HitBrightness='1'; HitDensity='0.1'; HitSize='1'; CutBrightness='1'; CutLength='1'; CutWidth='1' }
     BlockLightning = @{ Enabled='false'; RandomTrigger='true'; Chance='0.10'; RandomColor='false'; Brightness='1'; Size='1'; R='0.12'; G='0.58'; B='1' }
 }
 $defaults['Color.Melee'] = @{ Enabled='false'; R='0.0384615'; G='0.123077'; B='1' }
 $defaults['Color.Bow'] = @{ Enabled='false'; R='0.0384615'; G='0.123077'; B='1' }
 $defaults['Color.Hit'] = @{ Enabled='true'; R='1'; G='0.72'; B='0.24' }
 foreach ($profile in @('none','fire','frost','shock','green','purple','blue','red','bound','sun','unknown')) {
-    $defaults["Enchantment.$profile"] = @{ Enabled='false'; CustomColor='false'; R='.0384615'; G='.123077'; B='1'; Brightness='1'; Density='1'; Size='1'; Spread='1'; SwordEnabled='true'; SwordPlayer='true'; SwordNPC='true'; SwordTip='true'; SwordKeepPrecisionTrail='true'; ReleasedTrail='true'; RibbonLifetime='0.2'; ParticleLifetime='0.3'; RibbonWidth='0.5'; TrailMomentum='0.1'; RibbonFadeOut='0.25'; ParticleFadeOut='0.4'; ParticleGravity='0.3'; BowEnabled='true'; BowPlayer='true'; BowNPC='true'; BowGathering='true'; BowRings='true'; BowTrails='true'; BowCustomColor='false'; BowBrightness='1'; BowDensity='1'; BowSize='1'; BowR='.0384615'; BowG='.123077'; BowB='1' }
+    $defaults["Enchantment.$profile"] = @{ Enabled='false'; CustomColor='false'; R='.0384615'; G='.123077'; B='1'; Brightness='1'; Density='1'; Size='1'; Spread='1'; SwordEnabled='true'; SwordPlayer='true'; SwordNPC='true'; SwordTip='true'; SwordKeepPrecisionTrail='true'; ReleasedTrail='false'; RibbonLifetime='0.2'; ParticleLifetime='0.3'; RibbonWidth='0.5'; TrailMomentum='0.1'; RibbonFadeOut='0.25'; ParticleFadeOut='0.4'; ParticleGravity='0.3'; BowEnabled='true'; BowPlayer='true'; BowNPC='true'; BowGathering='true'; BowRings='true'; BowTrails='true'; BowCustomColor='false'; BowBrightness='1'; BowDensity='1'; BowSize='1'; BowR='.0384615'; BowG='.123077'; BowB='1' }
 }
-$defaults['Color.SlashSparks'] = @{ Enabled='true'; R='1'; G='0.72'; B='0.24' }
 $defaults['Color.Cut'] = @{ Enabled='true'; R='0.835886'; G='0.537747'; B='0' }
 $defaults['Color.Block'] = @{ Enabled='true'; R='1'; G='0.72'; B='0.24' }
-$defaults['Color.Wave'] = @{ Enabled='true'; R='1'; G='0.84'; B='0.45' }
 Require (-not $settings.ContainsKey('StaffParticles')) 'Removed staff settings must not be packaged'
 Require ($settings.Count -eq $defaults.Count) 'Unexpected or missing INI sections'
 foreach ($section in $defaults.Keys) {
@@ -214,7 +212,7 @@ foreach ($field in @('redsandRealtimeMenu', 'runtimeParticleSettings', 'bowConti
 Require ($manifest.PSObject.Properties.Name -contains 'swordTipAttachment' -and $manifest.swordTipAttachment -eq 2) 'Sword-tip provenance must declare the swept-emitter implementation'
 Require ($manifest.PSObject.Properties.Name -contains 'optionalPrecisionRibbonAlongsideParticles' -and $manifest.optionalPrecisionRibbonAlongsideParticles -eq $true) 'Missing independent Precision ribbon provenance'
 Require ($manifest.PSObject.Properties.Name -contains 'keepPrecisionTrailDefault' -and $manifest.keepPrecisionTrailDefault -eq $true) 'Approved dual trails should be the default'
-Require ($manifest.impactVFXControls -eq 3 -and $manifest.impactVFXContinuous -eq $true) 'Missing continuous impact runtime-control provenance'
+Require ($manifest.impactVFXControls -eq 7 -and $manifest.impactVFXContinuous -eq $true) 'Missing continuous impact runtime-control provenance'
 Require (($manifest.impactVFXBrightnessRange -join ',') -eq '0,20' -and ($manifest.impactVFXDensityRange -join ',') -eq '0,10' -and ($manifest.impactVFXSizeRange -join ',') -eq '0.05,10') 'Continuous control range mismatch'
 Require ($manifest.impactVFXNativeMeasuredSlash -eq 1) 'Native measured slash must be declared'
 Require (($manifest.impactVFXModelRouteTypes -join ',') -eq 'IPCT') 'Impact route type provenance is incomplete'

@@ -161,7 +161,7 @@ namespace
 
 RedsandSettings::Config BowConfiguration(RE::Actor*) { return RedsandSettings::Get(); }
 RedsandSettings::Config StreamConfiguration(const Stream& stream, RedsandSettings::Config config) { RedsandSettings::ApplyBowAppearance(config, stream.enchantmentKey); return config; }
-float StreamDensity(const Stream& stream, float density) { const auto config = StreamConfiguration(stream, RedsandSettings::Get()); return config.enchantments.Find(stream.enchantmentKey) ? config.bowDensity : density; }
+float StreamDensity(const Stream& stream, float density) { const auto config = RedsandSettings::Get(); const auto* appearance = RedsandSettings::AppearanceFor(config, stream.enchantmentKey, ""); return appearance ? appearance->bowDensity : density; }
 #include "../source/BowArrowProcessing.inc"
 
 	void Check(bool condition, const char* message)
@@ -955,7 +955,7 @@ float StreamDensity(const Stream& stream, float density) { const auto config = S
 	}
 
 
-    void IndependentCategorySurvivesDisabledMainBowSettings()
+    void HomepageDisablesLegacyBowStreams()
     {
         Reset();
         ProcessArrow(Sample(1, 1), 1.f);
@@ -964,27 +964,18 @@ float StreamDensity(const Stream& stream, float density) { const auto config = S
         auto config = RedsandSettings::Get();
         config.bowEnabled = config.bowPlayer = config.bowNPC = false;
         config.bowGathering = config.bowRings = config.bowTrails = false;
-        RedsandSettings::EnchantmentAppearance profile; profile.enabled = true; profile.bowRings = false; profile.bowDensity = .25f;
+        RedsandSettings::EnchantmentAppearance profile; profile.enabled = false; profile.bowRings = false; profile.bowDensity = .25f;
         config.enchantments.Set("fire", profile);
         ApplyStreamConfiguration(config, true, [](const Stream&) { return &actor; });
-        Check(Find(1) != nullptr && Count(*Find(1), Kind::Ring) == 0,
-            "disabled main page blocked category bow stream or category ring disable was ignored");
-        RedsandSettings::current = config;
-        auto later = Sample(1, 2); later.livingTime = .3f;
-        ProcessArrow(later, 0.f, false, false);
-        Check(Find(1) && Count(*Find(1), Kind::Trail) > 0 && Find(1)->enchantmentKey == "fire",
-            "in-flight category was replaced by main bow values on the next sample");
-        profile.bowEnabled = false; config.bowEnabled = config.bowPlayer = config.bowTrails = true;
-        config.enchantments.Set("fire", profile);
-        ApplyStreamConfiguration(config, true, [](const Stream&) { return &actor; });
-        Check(Find(1) == nullptr, "enabled main page resurrected a disabled category bow stream");
+        Check(Find(1) == nullptr, "a legacy profile bypassed the homepage bow disable");
+
     }
 
 }
 
 int main() try
 {
-        IndependentCategorySurvivesDisabledMainBowSettings();
+        HomepageDisablesLegacyBowStreams();
 	FullBudgetKeepsAcceptingShotsAndDoesNotReplayEvictedArrows();
 	FailedSpawnRetriesWithoutCancellingTheNextDraw();
 	OlderWorkerSampleCannotCancelANewerDraw();

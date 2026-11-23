@@ -1,6 +1,9 @@
 #include "RedsandBlockLightning.h"
 #include "RedsandBlockLightningPolicy.h"
+#include "RedsandMaterialColor.h"
 #include "RedsandSettings.h"
+#include <RE/N/NiControllerManager.h>
+#include <RE/N/NiControllerSequence.h>
 #include <RE/T/TESHitEvent.h>
 #include <RE/S/ScriptEventSourceHolder.h>
 #include <chrono>
@@ -70,6 +73,20 @@ namespace
             return RE::BSEventNotifyControl::kContinue;
         }
     } hitSink;
+    void StartCompanionSparks(RE::NiAVObject& root, const std::array<float, 3>& color)
+    {
+        static const RE::BSFixedString rootName{ "RedsandSekiroSparks_v1" }, shapeName{ "pSmallSparks" };
+        auto* sparks = root.GetObjectByName(rootName);
+        if (!sparks) return;
+        auto* geometry = netimmerse_cast<RE::BSGeometry*>(sparks->GetObjectByName(shapeName));
+        auto* shader = geometry ? netimmerse_cast<RE::BSEffectShaderProperty*>(geometry->GetGeometryRuntimeData().shaderProperty.get()) : nullptr;
+        auto* material = shader ? shader->GetMaterial() : nullptr;
+        auto* manager = sparks->GetController<RE::NiControllerManager>();
+        auto* sequence = manager ? manager->GetSequenceByName("SpecialIdle_AreaEffect") : nullptr;
+        if (!sequence || !RedsandMaterialColor::Commit(shader, material, color, std::nullopt, true,
+            [](auto* copy) { copy->~BSEffectShaderMaterial(); RE::free(copy); })) return;
+        if (sequence->Inactive()) sequence->Activate(0, true, 1.f, 0.f, nullptr, false);
+    }
     bool Bind(Effect& effect)
     {
         auto* root = effect.particle->particleObject.get();
@@ -91,6 +108,7 @@ namespace
             copy->~BSEffectShaderMaterial(); RE::free(copy);
             effect.branches[i] = {node, shader, geometry, node->local};
         }
+        StartCompanionSparks(*root, effect.color);
         effect.bound = true;
         return true;
     }
@@ -178,7 +196,7 @@ void Update()
             material->texCoordOffset[0] = material->texCoordOffset[1] = RE::NiPoint2{MaskOffset(pose), 0.f};
             branch.geometry->SetMaterialNeedsUpdate(true);
         }
-        RE::NiUpdateData update{}; root->Update(update);
+        RE::NiUpdateData update{}; root->UpdateTransformAndBounds(update);
     }
 }
 }

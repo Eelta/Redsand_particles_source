@@ -10,6 +10,7 @@ bool AttackTrail::UpdateRedsandParticles(float a_deltaTime)
 		for (auto& system : redsandSystems) { LogRedsandParticles(system.get(), "drain-start"sv); }
 	}
 	std::uint32_t liveParticles = 0;
+	std::optional<float> simulationTime;
 	for (auto& system : redsandSystems) {
 		if (stopEmission) {
 			for (auto controller = system->GetControllers(); controller; controller = controller->GetNext()) {
@@ -32,10 +33,20 @@ bool AttackTrail::UpdateRedsandParticles(float a_deltaTime)
 			}
 		}
 		if (auto data = system->GetParticlesRuntimeData().particleData) {
-			liveParticles += data->GetParticlesRuntimeData().numVertices;
+			const auto count = data->GetParticlesRuntimeData().numVertices;
+			liveParticles += count;
+			const float updated = system->GetParticleSystemRuntimeData().lastUpdate;
+			if (count && std::isfinite(updated) && updated >= 0.f) {
+				simulationTime = std::max(simulationTime.value_or(updated), updated);
+			}
 		}
 	}
-	redsandDrain.Advance(a_deltaTime);
+	const bool wasStalled = redsandDrain.IsStalled();
+	redsandDrain.Advance(a_deltaTime, simulationTime);
+	if (!wasStalled && redsandDrain.IsStalled() && redsandConfig.diagnostics) {
+		RedsandLog::info("Redsand trail simulation stalled: trail={} drain={} live={} simulationTime={}",
+			fmt::ptr(this), redsandDrain.elapsed, liveParticles, simulationTime.value_or(-1.f));
+	}
 	const float safetyAlpha = redsandDrain.SafetyAlpha();
 	visibilityPercent = safetyAlpha;
 	RE::BSVisit::TraverseScenegraphGeometries(trailParticle->particleObject.get(), [&](RE::BSGeometry* geometry) {
@@ -49,6 +60,7 @@ bool AttackTrail::UpdateRedsandParticles(float a_deltaTime)
 		if (redsandConfig.diagnostics) {
 			for (auto& system : redsandSystems) { LogRedsandParticles(system.get(), "drain-end"sv); }
 		}
+		if (redsandDrain.IsStalled()) { trailParticle->particleObject->SetAppCulled(true); }
 		trailParticle->age = trailParticle->lifetime + 1.f;
 		bActive = false;
 		return false;

@@ -136,21 +136,21 @@ int main()
         Check(!result.color && runtime.compatibleQueries == queries, "particle fallback changed or queried companion ribbon color");
         runtime.ownRule.reset(); runtime.compatibleRule.reset();
         RedsandSettings::EnchantmentAppearance appearance;
-        appearance.enabled = true; appearance.color.custom = true; appearance.color.rgb = {1.f, .1f, .2f}; appearance.brightness = 3.f; appearance.density = 0.f;
+        appearance.enabled = false; appearance.color.custom = true; appearance.color.rgb = {1.f, .1f, .2f}; appearance.brightness = 3.f; appearance.density = 0.f;
         runtime.config.enchantments.Set("fire", appearance);
         result = runtime.Resolve(&weapon);
-        Check(result.config.swordBrightness == 3.f && result.config.swordDensity == 0.f && result.config.colors[0].rgb[0] == 1.f,
-            "exact enchantment profile did not reach production melee settings");
+        Check(result.config.swordBrightness == runtime.config.swordBrightness && result.config.swordDensity == runtime.config.swordDensity,
+            "an obsolete profile replaced homepage melee settings");
         runtime.config.enchantments.Set("unknown", appearance);
         appearance.brightness = 2.f; runtime.config.enchantments.Set("none", appearance);
         result = runtime.Resolve(&weapon, {}, false, 0.f);
-        Check(result.config.swordBrightness == 2.f && result.key == "none", "depleted profile mixed with active enchantment");
+        Check(result.config.swordBrightness == runtime.config.swordBrightness && result.key == "none", "depleted profile mixed with active enchantment");
         result = runtime.Resolve(&weapon, {}, true);
         Check(!result.color, "profile recolored companion ribbon");
         weapon.magic = nullptr;
         appearance.brightness = 4.f; runtime.config.enchantments.Set("none", appearance);
         result = runtime.Resolve(&weapon);
-        Check(result.config.swordBrightness == 4.f && result.key == "none", "unenchanted fallback was ignored");
+        Check(result.config.swordBrightness == runtime.config.swordBrightness && result.key == "none", "unenchanted fallback was ignored");
         std::cout << "Actual TrailEnchantment fragment: API palette fill, three effects, neutral masks, direct keywords, explicit white, depletion and companion isolation passed\n";
     } catch (const std::exception& e) { std::cerr << e.what() << '\n'; return 1; }
 }

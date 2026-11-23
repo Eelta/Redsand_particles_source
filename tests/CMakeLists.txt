@@ -40,25 +40,22 @@ redsand_test(enchantment_profiles_tests independent_enchantment_profiles_and_per
 redsand_test(appearance_policy_tests live_rgb_and_cut_length_policy)
 redsand_test(random_slash_tests per_attack_independent_random_colors_and_bounded_values)
 redsand_test(material_color_tests private_material_tint_published_before_particle_pass)
-redsand_test(slash_update_tests production_slash_controls_and_nested_updates)
+redsand_test(slash_update_tests production_nested_scene_updates)
 redsand_test(weapon_profile_tests vanilla_weapon_classification_and_mod_fallback)
 redsand_test(particle_brightness_tests repeated_attack_live_brightness)
 redsand_test(logging_tests independent_realtime_diagnostic_log ../source/RedsandLog.cpp ../source/RedsandSettings.cpp)
 redsand_test(block_lightning_tests independent_player_block_lightning_policy ../source/RedsandSettings.cpp)
 add_test(NAME world_space_lightning_assets COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/block_lightning_assets_tests.py")
 set_tests_properties(world_space_lightning_assets PROPERTIES ENVIRONMENT "PYTHONDONTWRITEBYTECODE=1")
-add_test(NAME slash_asset_visual_invariants_and_secondary_density
+add_test(NAME cut_and_impact_meshes_without_removed_layers
     COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/slash_assets_tests.py")
-set_tests_properties(slash_asset_visual_invariants_and_secondary_density PROPERTIES ENVIRONMENT "PYTHONDONTWRITEBYTECODE=1")
+set_tests_properties(cut_and_impact_meshes_without_removed_layers PROPERTIES ENVIRONMENT "PYTHONDONTWRITEBYTECODE=1")
 add_test(NAME source_checkout_without_local_publication_docs
     COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/package_optional_docs_tests.py")
 set_tests_properties(source_checkout_without_local_publication_docs PROPERTIES ENVIRONMENT "PYTHONDONTWRITEBYTECODE=1")
 add_test(NAME retained_slash_texture_source_reproduction
     COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/legacy_mask_sources_tests.py")
 set_tests_properties(retained_slash_texture_source_reproduction PROPERTIES ENVIRONMENT "PYTHONDONTWRITEBYTECODE=1")
-add_test(NAME independently_generated_shockwave_refraction_glow_and_fade
-    COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/shockwave_assets_tests.py")
-set_tests_properties(independently_generated_shockwave_refraction_glow_and_fade PROPERTIES ENVIRONMENT "PYTHONDONTWRITEBYTECODE=1")
 target_compile_definitions(logging_tests PRIVATE REDSAND_LOG_STANDALONE)
 
 

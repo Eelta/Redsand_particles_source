@@ -48,7 +48,7 @@ def main():
                 assert (args.precision_data / t).is_file(), f'Missing minimal-install texture: {t} ({rel})'
                 external[t] = 'Required original Precision installation'
     document = tomllib.loads((data / 'SKSE/Plugins/RedsandImpactVFX.toml').read_text('utf-8-sig'))
-    assert len(document['Native']) == 5 and len(document['Route']) == 26
+    assert {route['id'] for route in document['Native']} == {'Hit', 'Stone', 'Slash', 'Block'} and len(document['Native']) == 4 and len(document['Route']) == 26
     assert all(route['plugin'] == 'Skyrim.esm' for route in document['Route'])
     for route in document['Route']:
         for model in route['models'] + [route['baseModel']] + ([route['offModel']] if 'offModel' in route else []):
@@ -57,7 +57,7 @@ def main():
         assert 'Meshes/' + route['model'].replace('\\', '/') in files
     result = {'passed': True, 'files': len(files), 'nifs': nifs,
               'dds': sum(p.suffix.lower() == '.dds' for p in files.values()),
-              'native_layers': 5, 'vanilla_routes': len(document['Route']),
+              'native_layers': len(document['Native']), 'vanilla_routes': len(document['Route']),
               'external_textures': external, 'chaos_required': False,
               'precision_ribbon_resources_overridden': False, 'game_tested': False}
     if args.archive:

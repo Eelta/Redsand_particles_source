@@ -1,7 +1,16 @@
 bool UpdateRedsandSwingTrail(float delta);
+	void RetireRedsandSwingTrail();
+	bool CreateRedsandSwingRoot(RE::Actor& actor);
 	RedsandSwingTrail::Simulation redsandSwingSimulation;
 	RedsandSwingTrail::Lease redsandSwingLease;
+	std::optional<RE::NiTransform> redsandSwingStart;
+	std::optional<RE::NiPoint3> redsandBladeTip;
+	std::string_view redsandBladeSource = "weapon-axis";
+	bool redsandBladeMeasured = false;
+	RE::NiPointer<RE::NiNode> redsandSwingRoot;
+	RE::NiPointer<RE::NiAVObject> redsandSwingActorRoot;
 	bool redsandReleasedSelected = false, redsandSwingReady = false;
+	bool redsandSwingSpawnAttempted = false, redsandSwingPublished = false;
 	float redsandSwingWaiting = 0.f;
 	bool UpdateRedsandParticles(float a_deltaTime);
 	void RetireRedsandNativeTrail();
@@ -21,6 +30,10 @@ bool UpdateRedsandSwingTrail(float delta);
 		float originalRate;
 		Redsand::Emission::Scalar kind;
 	};
+	struct RedsandEmitterSize {
+		RE::NiPointer<RE::NiPSysModifier> emitter;
+		Redsand::Emission::RadiusRange authored;
+	};
 	struct RedsandGravity {
 		RE::NiPointer<RE::NiPSysGravityModifier> modifier;
 		float strength, turbulence;
@@ -31,6 +44,8 @@ bool UpdateRedsandSwingTrail(float delta);
 	};
 	std::vector<RedsandBirthRate> redsandBirthRates;
 	std::vector<RedsandGravity> redsandGravity;
+	std::vector<RedsandEmitterSize> redsandEmitterSizes;
+	float redsandAppliedSize = 1.f;
 	std::vector<RedsandEmitterMesh> redsandEmitterMeshes;
 	RE::NiPoint3 redsandPreviousTip;
 	bool redsandTipSample = false;

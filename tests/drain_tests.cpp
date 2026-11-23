@@ -33,6 +33,27 @@ int main()
 	check(stalled.SafetyAlpha() == 0.5f && !stalled.CanRetire(100), "fallback did not fade before removal");
 	stalled.Advance(0.5f);
 	check(stalled.SafetyAlpha() == 0.f && stalled.CanRetire(100), "stalled trail leaked");
+	RedsandDrainState frozen;
+	frozen.BeginDrain();
+	frozen.Advance(.01f, 10.f);
+	frozen.Advance(.5f, 10.f);
+	check(!frozen.IsStalled(), "briefly stalled trail lost its grace period");
+	frozen.Advance(.01f, 10.1f);
+	frozen.Advance(.5f, 10.1f);
+	check(!frozen.IsStalled(), "a resumed trail carried over its old stall timer");
+	frozen.Advance(.25f, 10.1f);
+	check(frozen.IsStalled() && frozen.SafetyAlpha() == 1.f, "frozen simulation did not start a graceful fade");
+	frozen.Advance(.125f, 10.1f);
+	check(frozen.SafetyAlpha() > 0.f && frozen.SafetyAlpha() < 1.f && !frozen.CanRetire(200),
+		"frozen particles were cut before fading");
+	frozen.Advance(.126f, 10.2f);
+	check(frozen.CanRetire(200), "frozen particles retained their old slots after fading");
+
+	RedsandDrainState advancing;
+	advancing.BeginDrain();
+	for (int step = 0; step < 40; ++step) { advancing.Advance(.1f, static_cast<float>(step)); }
+	check(!advancing.IsStalled() && !advancing.CanRetire(200), "an unchanged live count was mistaken for a stall");
+
 	std::vector<RedsandDrainState> trails;
 	std::size_t peak = 0;
 	std::size_t emissionStops = 0;

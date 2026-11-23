@@ -465,6 +465,16 @@ namespace
 	void LiveScalarValuesAlwaysUseAuthoredConstants()
 	{
 		using namespace Redsand::Emission;
+		const RadiusRange sword{ 9.f, 2.f };
+		Check(sword.Matches(9.f) && !sword.Matches(7.f) && !RadiusRange{ 9.f, 10.f }.Matches(9.f),
+			"emitter radius layout validation accepted inconsistent fields");
+		for (const float size : { RedsandSettings::minSize, .25f, 1.f, 2.f, .25f }) {
+			const auto scaled = sword.Scaled(size);
+			Check(Same(scaled.initial, 9.f * size) && Same(scaled.variation, 2.f * size) &&
+				Same(scaled.initial + scaled.variation, 11.f * size),
+				"the largest random radius must scale with the size setting");
+		}
+
 		RedsandSettings::Config config;
 		for (const float spread : { 0.25f, 2.f, 0.f, 1.f, 0.25f }) {
 			config.swordSpread = spread;
@@ -600,30 +610,32 @@ namespace
 		traced.Select(diagnostics, &npc, &weapon, own, customRibbon);
 		Check(RedsandLog::informationLogs == 3, "scope diagnostics did not log once per construction or repeated the profile report");
 	}
-    void IndependentCategoryOverridesConstructorScope()
+    void HomepageControlsDisabledProfiles()
     {
         ScopeFixture fixture;
         RE::Actor actor; actor.player = true;
         RE::TESObjectWEAP weapon;
-        RedsandSettings::Config config; config.swordEnabled = false; config.swordPlayer = false; config.swordBrightness = 0.f;
-        RedsandSettings::EnchantmentAppearance profile; profile.enabled = true; profile.brightness = 4.f;
-        config.enchantments.Set("none", profile);
-        fixture.Select(config, &actor, &weapon, "", "Effects/WeaponTrails/AttackTrail.nif");
-        Check(fixture.redsandScopeAllowed && !fixture.redsandLegacyTrail && fixture.redsandConfig.swordBrightness == 4.f,
-            "category was blocked by disabled main melee scope before Spawn");
-        Check(fixture.redsandReleasedSelected, "enabled category lost the default Redsand replacement");
-        config.swordReleasedTrail = false;
-        fixture.Select(config, &actor, &weapon, "", "Effects/WeaponTrails/AttackTrail.nif");
-        Check(fixture.redsandReleasedSelected, "main mode switch overrode the independent category");
-        profile.swordReleasedTrail = false; config.swordReleasedTrail = true; config.enchantments.Set("none", profile);
-        fixture.Select(config, &actor, &weapon, "", "Effects/WeaponTrails/AttackTrail.nif");
-        Check(!fixture.redsandReleasedSelected, "category mode disable was overridden by the main mode switch");
-        profile.swordReleasedTrail = true; config.enchantments.Set("none", profile);
-        const auto external = fixture.Select(config, &actor, &weapon, "Custom/Ribbon.nif", "RedsandParticles/Default.nif");
-        Check(external == "Custom/Ribbon.nif" && !fixture.redsandReleasedSelected, "independent category took ownership of an external mesh");
-        profile.swordEnabled = false; config.swordEnabled = true; config.swordPlayer = true; config.enchantments.Set("none", profile);
-        fixture.Select(config, &actor, &weapon, "", "Effects/WeaponTrails/AttackTrail.nif");
-        Check(!fixture.redsandScopeAllowed && fixture.redsandLegacyTrail, "category disable was overridden by main melee enable");
+        RedsandSettings::Config config;
+        config.swordEnabled = true;
+        config.swordReleasedTrail = true;
+        config.swordBrightness = 2.f;
+        RedsandSettings::EnchantmentAppearance oldProfile;
+        oldProfile.enabled = false; oldProfile.swordReleasedTrail = false; oldProfile.brightness = 4.f;
+        config.enchantments.Set("none", oldProfile);
+        constexpr auto native = "Effects/WeaponTrails/AttackTrail.nif";
+        Check(fixture.Select(config, &actor, &weapon, "RedsandParticles/Default.nif", native) == "RedsandSwingTrail/Arc.nif" &&
+            fixture.redsandReleasedSelected && fixture.redsandConfig.swordEnabled && fixture.redsandConfig.swordBrightness == 2.f,
+            "a disabled profile replaced the homepage particle mode");
+        config.swordEnabled = true;
+        Check(fixture.Select(config, &actor, &weapon, "RedsandParticles/Default.nif", native) == "RedsandSwingTrail/Arc.nif" &&
+            fixture.redsandReleasedSelected && fixture.redsandConfig.swordEnabled,
+            "the homepage could not enable ribbon and particles together");
+        oldProfile.enabled = true;
+        oldProfile.swordEnabled = true;
+        config.enchantments.Set("none", oldProfile);
+        fixture.Select(config, &actor, &weapon, "RedsandParticles/Default.nif", native);
+        Check(!fixture.redsandReleasedSelected && fixture.redsandConfig.swordBrightness == 4.f,
+            "reenabling a category did not restore its saved sword settings");
     }
 
 }
@@ -640,7 +652,7 @@ int main()
 		LiveScalarValuesAlwaysUseAuthoredConstants();
 		ConstructorScopeCannotReenterParticlesThroughMeshOverrides(false);
 		ConstructorScopeCannotReenterParticlesThroughMeshOverrides(true);
-        IndependentCategoryOverridesConstructorScope();
+        HomepageControlsDisabledProfiles();
 		std::cout << "PASS: legacy/converted source discovery, consecutive tip sweep, discontinuity resets, category endpoints, scene propagation and legacy isolation\n";
 		return 0;
 	} catch (const std::exception& exception) {

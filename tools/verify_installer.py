@@ -108,6 +108,10 @@ def main():
             assert cfg.getboolean('ImpactVFX', 'Enabled') == any(flags[k] == 'on' for k in ('hit', 'slash', 'block'))
             for key in ('hit', 'slash', 'block'):
                 assert cfg.getboolean('ImpactVFX', key) == (flags[key] == 'on')
+            toggles = {'enabled', 'hit', 'slash', 'block'}
+            assert {k: v for k, v in cfg['ImpactVFX'].items() if k not in toggles} == {
+                k: v for k, v in original['ImpactVFX'].items() if k not in toggles
+            }, 'Installer changed an impact control'
             for section in cfg.sections():
                 if section.startswith('Color.'):
                     original = configparser.ConfigParser()
@@ -116,7 +120,7 @@ def main():
             assert {name for name in payload if name.endswith('.dll')} == {'SKSE/Plugins/Precision.dll'}
             content = z.read(payload[route_name])
             routes = tomllib.loads(content.decode('utf-8-sig'))
-            assert len(routes['Native']) == 5
+            assert {route['id'] for route in routes['Native']} == {'Hit', 'Stone', 'Slash', 'Block'}
             assert all(route['plugin'] == 'Skyrim.esm' for route in routes['Route'])
             expected = [r for r in base_routes if flags[r['category'].lower()] == 'on']
             assert routes['Route'] == expected
@@ -136,17 +140,17 @@ def main():
         defaults.read_string(default_payload[ini_name].decode('utf-8-sig'))
         for section, keys in {'SwordParticles': ('Brightness', 'Density', 'Spread', 'Size'),
                               'BowParticles': ('Brightness', 'Density'),
-                              'ImpactVFX': ('Brightness', 'Size', 'CutLength')}.items():
+                              'ImpactVFX': ('Brightness', 'Size', 'HitBrightness', 'HitSize', 'CutBrightness', 'CutLength')}.items():
             assert all(defaults.getfloat(section, key) == 1 for key in keys)
-        for key, value in {'Density': .1, 'SlashDistance': .1, 'SlashSpread': 0, 'SlashDensity': 0}.items():
+        for key, value in {'Density': .1, 'HitDensity': .1, 'CutLength': 1, 'CutWidth': 1}.items():
             assert defaults.getfloat('ImpactVFX', key) == value
         assert not defaults.getboolean('ImpactVFX', 'RandomSlashColor')
         assert not defaults.getboolean('ImpactVFX', 'RandomSlashValues')
-        assert defaults.getboolean('SwordParticles', 'ReleasedTrail')
+        assert not defaults.getboolean('SwordParticles', 'ReleasedTrail')
         assert defaults.getfloat('SwordParticles', 'RibbonLifetime') == .2
         assert defaults.getfloat('SwordParticles', 'ParticleLifetime') == .3
         for section in ['SwordParticles'] + [n for n in defaults.sections() if n.startswith('Enchantment.')]:
-            assert defaults.getboolean(section, 'ReleasedTrail')
+            assert not defaults.getboolean(section, 'ReleasedTrail')
             assert defaults.getfloat(section, 'RibbonLifetime') == .2
             assert defaults.getfloat(section, 'ParticleLifetime') == .3
             assert defaults.getfloat(section, 'RibbonWidth') == .5
@@ -157,7 +161,7 @@ def main():
 
         for key in ('none', 'fire', 'frost', 'shock', 'green', 'purple', 'blue', 'red', 'bound', 'sun', 'unknown'):
             assert not defaults.getboolean('Enchantment.' + key, 'Enabled')
-            assert defaults.getboolean('Enchantment.' + key, 'ReleasedTrail')
+            assert not defaults.getboolean('Enchantment.' + key, 'ReleasedTrail')
             assert not defaults.getboolean('Enchantment.' + key, 'CustomColor')
             assert not defaults.getboolean('Enchantment.' + key, 'BowCustomColor')
             for value in ('Brightness', 'Density', 'Size', 'Spread', 'BowBrightness', 'BowDensity', 'BowSize'):

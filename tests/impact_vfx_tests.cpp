@@ -222,29 +222,27 @@ void ManifestParserRejectsBadAndDuplicateRoutes()
 	Check(ValidRoute(mixedCase), "vanilla plugin comparison became case sensitive");
 }
 
-void NativeLayersCoverUnarmoredHitsAndPowerAttacks()
+void NativeHitAndSlashLayersAreIndependent()
 {
 	RedsandSettings::Config config;
-	auto layers=SelectNativeHitLayers(true,true,false,true,false,true,false,false,config);
-	Check(layers.fallbackHit && layers.slash && !layers.refraction,"unarmored melee hit lost its fallback/slash");
-	layers=SelectNativeHitLayers(true,true,false,true,true,true,true,true,config);
-	Check(layers.fallbackHit && layers.slash && layers.refraction,"armored target lost native hit or single power-critical wave");
-	layers=SelectNativeHitLayers(true,true,false,false,false,false,true,false,config);
-	Check(layers.fallbackHit && !layers.slash && layers.refraction,"NPC blunt/power hit lost independent native layers");
-	for(auto invalid: {SelectNativeHitLayers(false,true,false,true,false,true,true,true,config),
-		SelectNativeHitLayers(true,false,false,true,false,true,true,true,config),
-		SelectNativeHitLayers(true,true,true,true,false,true,true,true,config)}) {
-		Check(!invalid.fallbackHit && !invalid.slash && !invalid.refraction,"blocked/bash/non-melee/non-actor hit produced visuals");
+	auto layers = SelectNativeHitLayers(true, true, false, true, config);
+	Check(layers.fallbackHit && layers.slash, "blade hit lost its sparks or cut");
+	layers = SelectNativeHitLayers(true, true, false, false, config);
+	Check(layers.fallbackHit && !layers.slash, "blunt hit lost sparks or spawned a blade cut");
+	for (auto invalid : { SelectNativeHitLayers(false, true, false, true, config),
+		SelectNativeHitLayers(true, false, false, true, config), SelectNativeHitLayers(true, true, true, true, config) }) {
+		Check(!invalid.fallbackHit && !invalid.slash, "blocked/bash/non-melee/non-actor hit produced visuals");
 	}
-	config.impactSlash=false;
-	layers=SelectNativeHitLayers(true,true,false,true,false,true,true,false,config);
-	Check(layers.fallbackHit && !layers.slash && layers.refraction,"slash toggle disabled independent hit layers");
-	config.impactHit=false;config.impactSlash=true;
-	layers=SelectNativeHitLayers(true,true,false,true,false,true,true,false,config);
-	Check(!layers.fallbackHit && layers.slash && !layers.refraction,"hit toggle leaked native layers");
-	config.impactEnabled=false;
-	layers=SelectNativeHitLayers(true,true,false,true,false,true,true,true,config);
-	Check(!layers.fallbackHit && !layers.slash && !layers.refraction,"master off leaked visuals");
+	config.impactSlash = false;
+	layers = SelectNativeHitLayers(true, true, false, true, config);
+	Check(layers.fallbackHit && !layers.slash, "slash toggle disabled hit sparks");
+	config.impactHit = false;
+	config.impactSlash = true;
+	layers = SelectNativeHitLayers(true, true, false, true, config);
+	Check(!layers.fallbackHit && layers.slash, "hit toggle disabled the cut");
+	config.impactEnabled = false;
+	layers = SelectNativeHitLayers(true, true, false, true, config);
+	Check(!layers.fallbackHit && !layers.slash, "master off leaked visuals");
 }
 
 void FormFreeNativePlaybackPolicies()
@@ -310,6 +308,11 @@ void NativeManifestRejectsFormDependenciesAndMalformedLayers()
 	write("schemaVersion=1\n" + layer);
 	const auto loaded = Manifest::ReadNativeRoutes(path);
 	Check(loaded.size()==1 && loaded[0].layer==NativeLayer::Hit && loaded[0].duration==.85f && ValidNativeRoute(loaded[0]), "native model-only manifest lost fields");
+	const std::string retired = "\n[[Native]]\nid='Wave'\nmodel='Retired/SoftRefraction.nif'\nduration=0.85\n";
+	write("schemaVersion=1\n" + layer + retired);
+	const auto compatible = Manifest::ReadNativeRoutes(path);
+	Check(compatible.size() == 1 && compatible[0].layer == NativeLayer::Hit,
+		"legacy Wave route was retained or interfered with hit sparks");
 	write("schemaVersion=1\nRoute=[]\n" + layer);
 	Check(Manifest::ReadRoutes(path).empty() && Manifest::ReadNativeRoutes(path).size() == 1,
 		"weapon-only installation required third-party impact redirects");
@@ -338,7 +341,7 @@ int main(int argc, char** argv)
 	try {
 		Independent64Combinations(); NativeDisableRestoreAndReenable(); ClassIsolationAndOwnSlashOff();
 		UnavailableModelsOnlySkipAffectedRoutes();
-		NativeLayersCoverUnarmoredHitsAndPowerAttacks();
+		NativeHitAndSlashLayersAreIndependent();
 		FormFreeNativePlaybackPolicies();
 		NativeManifestRejectsFormDependenciesAndMalformedLayers();
 		ThirdPartyOwnershipProtection(); ExplosionNeverOwnsData(); ProjectileSuppressionAndRestoration(); InvalidRoutesFailClosed();
@@ -346,7 +349,7 @@ int main(int argc, char** argv)
 		if (argc == 2) {
 			const auto loaded = Manifest::ReadRoutes(argv[1]);
 			const auto native = Manifest::ReadNativeRoutes(argv[1]);
-			Check(native.size()==5,"installed native manifest must cover all five independent layers");
+			Check(native.size()==nativeLayerNames.size(),"installed native manifest is missing a supported layer");
 			std::cout << "Actual manifest parsed by production C++ decoder: " << loaded.size() << " routes, " << native.size() << " form-free native layers\n";
 		}
 		std::cout << "Impact VFX: 64 presets, restoration, category isolation, ownership and validation passed\n";

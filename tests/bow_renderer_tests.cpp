@@ -571,7 +571,7 @@ void liveColorRestoresInheritedTint()
 	check(PrepareRenderer(fixture.stream) == RendererStatus::Ready && fixture.stream.rendererColor.red == inherited.red, "bow tint did not restore after disabling RGB");
 }
 
-void separateEnchantmentColorOverridesGlobalAndRestores()
+void homepageBowColorOverridesLegacySettings()
 {
     Fixture fixture;
     fixture.Ready();
@@ -580,17 +580,17 @@ void separateEnchantmentColorOverridesGlobalAndRestores()
     auto config = RedsandSettings::Get();
     config.colors[1] = {true, {1.f, 0.f, 0.f}};
     RedsandSettings::EnchantmentAppearance profile;
-    profile.enabled = true; profile.bowColor.custom = true; profile.bowColor.rgb = {.2f, .4f, .8f};
+    profile.enabled = false; profile.bowColor.custom = true; profile.bowColor.rgb = {.2f, .4f, .8f};
+    config.enchantments.Set(fixture.stream.enchantmentKey, profile);
+    RedsandSettings::Set(config);
+    check(PrepareRenderer(fixture.stream) == RendererStatus::Ready && fixture.stream.rendererColor.red == 1.f,
+        "a disabled bow profile replaced the homepage color");
+    profile.enabled = true;
     config.enchantments.Set(fixture.stream.enchantmentKey, profile);
     RedsandSettings::Set(config);
     check(PrepareRenderer(fixture.stream) == RendererStatus::Ready && fixture.stream.rendererColor.blue == .8f,
-        "exact bow enchantment color lost to global custom color");
-    profile.bowColor.custom = false; config.enchantments.Set(fixture.stream.enchantmentKey, profile); RedsandSettings::Set(config);
-    check(PrepareRenderer(fixture.stream) == RendererStatus::Ready && fixture.stream.rendererColor.red == fixture.stream.color.red,
-        "automatic enchantment hue did not override global custom color");
-    profile.enabled = false; config.enchantments.Set(fixture.stream.enchantmentKey, profile); RedsandSettings::Set(config);
-    check(PrepareRenderer(fixture.stream) == RendererStatus::Ready && fixture.stream.rendererColor.red == 1.f,
-        "disabling exact bow profile failed to restore global settings");
+        "reenabling a bow profile did not restore its saved color");
+
 }
 
 int main() try
@@ -604,7 +604,7 @@ int main() try
 	diagnosticRateAndDisabledWork();
 	hiddenEffectRootRecoversOnlyForItsLiveParticles();
 	liveColorRestoresInheritedTint();
-    separateEnchantmentColorOverridesGlobalAndRestores();
+    homepageBowColorOverridesLegacySettings();
 	std::cout << "PASS: production renderer loading, isolated failure, scene graph replacement and live brightness\n";
 }
 catch (const std::exception& error)

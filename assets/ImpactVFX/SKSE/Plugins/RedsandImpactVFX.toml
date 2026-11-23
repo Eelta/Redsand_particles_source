@@ -25,12 +25,6 @@ category = "Block"
 model = "StellarImpact\\Block\\NormalBlock.nif"
 duration = 0.85
 
-[[Native]]
-id = "Wave"
-category = "Hit"
-model = "StellarImpact\\Refraction\\SoftRefraction.nif"
-duration = 0.85
-
 [[Route]]
 plugin = "Skyrim.esm"
 form = 0x013CBA

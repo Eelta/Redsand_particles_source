@@ -1,28 +1,12 @@
-if (redsandReleasedSelected) {
-    redsandConfig=RedsandSettings::Get();
-    RedsandSettings::ApplyMeleeAppearance(redsandConfig,redsandEnchantmentKey,redsandEnchantmentFallback);
-    auto actor=actorHandle.get();
-    if (!actor || !redsandConfig.swordEnabled || !(actor->IsPlayerRef() ? redsandConfig.swordPlayer : redsandConfig.swordNPC)) {
-        if (trailParticle) { if (trailParticle->particleObject) { trailParticle->particleObject->SetAppCulled(true); } trailParticle->age=trailParticle->lifetime+1.f; }
-        bActive=false;return false;
-    }
-    if (!redsandChecked && trailParticle && trailParticle->particleObject) {
-        RE::BSVisit::TraverseScenegraphGeometries(trailParticle->particleObject.get(),[&](RE::BSGeometry* geometry) {
-            if (geometry->name=="RedsandParticles_Drain_v1"sv) {
-                if (auto* system=netimmerse_cast<RE::NiParticleSystem*>(geometry)) { redsandSystems.emplace_back(system); }
-            }
-            return RE::BSVisit::BSVisitControl::kContinue;
-        });
-        redsandChecked=true;
-    }
-    return UpdateRedsandSwingTrail(a_deltaTime);
-}
-if (!redsandNativeOnly && !redsandChecked && trailParticle && trailParticle->particleObject) {
+		constexpr std::ptrdiff_t emitterRadiusOffset = 0x5C;
+		constexpr std::ptrdiff_t emitterVariationOffset = 0x60;
+		if (!redsandNativeOnly && !redsandChecked && trailParticle && trailParticle->particleObject) {
 			CacheRedsandEmissionMeshes(trailParticle->particleObject.get());
 			RE::BSVisit::TraverseScenegraphGeometries(trailParticle->particleObject.get(), [&](RE::BSGeometry* geometry) {
 				if (geometry->name == "RedsandParticles_Drain_v1"sv) {
 					if (auto system = netimmerse_cast<RE::NiParticleSystem*>(geometry)) {
 						redsandSystems.emplace_back(system);
+						std::optional<float> controllerRadius;
 						for (auto controller = system->GetControllers(); controller; controller = controller->GetNext()) {
 							if (controller->target != system) { continue; }
 							std::optional<Redsand::Emission::Scalar> kind;
@@ -45,6 +29,7 @@ if (!redsandNativeOnly && !redsandChecked && trailParticle && trailParticle->par
 									original->floatValue != -std::numeric_limits<float>::max() &&
 									(signedSpeed || original->floatValue >= 0.f);
 								const float rate = valid ? original->floatValue : fallback;
+								if (valid && *kind == Redsand::Emission::Scalar::Radius) { controllerRadius = rate; }
 								copy->floatValue = Redsand::Emission::Value(rate, *kind, redsandConfig);
 								interpController->SetInterpolator(copy.get(), 0);
 								redsandBirthRates.push_back({ std::move(copy), rate, *kind });
@@ -53,6 +38,13 @@ if (!redsandNativeOnly && !redsandChecked && trailParticle && trailParticle->par
 						for (auto& modifier : system->GetParticleSystemRuntimeData().modifierList) {
 							if (auto gravity = netimmerse_cast<RE::NiPSysGravityModifier*>(modifier.get())) {
 								redsandGravity.push_back({ RE::NiPointer<RE::NiPSysGravityModifier>(gravity), gravity->strength, gravity->turbulence });
+							} else if (redsandParticleSelected && controllerRadius && !REL::Module::IsVR() && modifier && modifier->target == system &&
+								std::string_view(modifier->GetRTTI()->GetName()) == "NiPSysMeshEmitter"sv) {
+								const Redsand::Emission::RadiusRange authored{
+									REL::RelocateMember<float>(modifier.get(), emitterRadiusOffset),
+									REL::RelocateMember<float>(modifier.get(), emitterVariationOffset)
+								};
+								if (authored.Matches(*controllerRadius)) { redsandEmitterSizes.push_back({ modifier, authored }); }
 							}
 						}
 					}
@@ -66,9 +58,9 @@ if (!redsandNativeOnly && !redsandChecked && trailParticle && trailParticle->par
 						return std::count_if(redsandBirthRates.begin(), redsandBirthRates.end(),
 							[&](const auto& item) { return item.kind == kind; });
 					};
-					RedsandLog::info("Redsand live emission controls: birth={} speed={} radius={} gravity={}",
+					RedsandLog::info("Redsand live emission controls: birth={} speed={} radius={} radiusVariance={} gravity={}",
 						count(Redsand::Emission::Scalar::BirthRate), count(Redsand::Emission::Scalar::Speed),
-						count(Redsand::Emission::Scalar::Radius), redsandGravity.size());
+						count(Redsand::Emission::Scalar::Radius), redsandEmitterSizes.size(), redsandGravity.size());
 					return true;
 				}();
 				if (redsandEmitterMeshes.empty()) {
@@ -98,6 +90,25 @@ if (!redsandNativeOnly && !redsandChecked && trailParticle && trailParticle->par
 				bActive = false;
 				return false;
 			}
+			const float size = redsandConfig.swordSize;
+			if (size != redsandAppliedSize) {
+				const float ratio = size / redsandAppliedSize;
+				for (const auto& entry : redsandEmitterSizes) {
+					auto* emitter = entry.emitter.get();
+					const auto scaled = entry.authored.Scaled(size);
+					REL::RelocateMember<float>(emitter, emitterRadiusOffset) = scaled.initial;
+					REL::RelocateMember<float>(emitter, emitterVariationOffset) = scaled.variation;
+					const auto* system = emitter->target;
+					if (auto data = system ? system->GetParticlesRuntimeData().particleData.get() : nullptr) {
+						auto& particles = data->GetParticlesRuntimeData();
+						if (particles.radii) {
+							const auto count = std::min(particles.numVertices, particles.maxNumVertices);
+							for (std::uint16_t i = 0; i < count; ++i) { particles.radii[i] *= ratio; }
+						}
+					}
+				}
+				redsandAppliedSize = size;
+			}
 			for (auto& birth : redsandBirthRates) {
 				birth.interpolator->floatValue = Redsand::Emission::Value(birth.originalRate, birth.kind, redsandConfig);
 			}
@@ -109,4 +120,20 @@ if (!redsandNativeOnly && !redsandChecked && trailParticle && trailParticle->par
 			if (bExpired) {
 				return UpdateRedsandParticles(a_deltaTime);
 			}
+		}
+		if (!trailParticle) {
+			if (redsandConfig.diagnostics && redsandActorIsPlayer) {
+				RedsandLog::info("Redsand trail creation failed: trail={} reason=no-temp-effect", fmt::ptr(this));
+			}
+			bActive = false;
+			return false;
+		}
+		if (!trailParticle->particleObject && (bExpired || currentTime >= 10.f || trailParticle->age > trailParticle->lifetime)) {
+			if (redsandConfig.diagnostics && redsandActorIsPlayer) {
+				RedsandLog::info("Redsand trail creation failed: trail={} reason=object-unready clock={} expired={}",
+					fmt::ptr(this), currentTime, bExpired);
+			}
+			trailParticle->age = trailParticle->lifetime + 1.f;
+			bActive = false;
+			return false;
 		}

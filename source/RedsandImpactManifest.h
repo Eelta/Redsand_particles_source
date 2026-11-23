@@ -81,14 +81,20 @@ namespace RedsandImpactVFX::Manifest
 		const auto* array = document["Native"].as_array();
 		if (!document.contains("Native")) { return {}; }
 		Require(array != nullptr, "Native impact layers must be an array of tables");
-		Require(!array->empty() && array->size() <= nativeLayerNames.size(), "Invalid native impact layer count");
+		Require(!array->empty() && array->size() <= nativeLayerNames.size() + 1, "Invalid native impact layer count");
 		std::vector<NativeRoute> definitions;
 		std::set<NativeLayer> identities;
+		bool legacyWave = false;
 		for (const auto& item : *array) {
 			const auto* table = item.as_table();
 			Require(table != nullptr, "Native impact layer must be a table");
 			Require(!table->contains("plugin") && !table->contains("form"), "Native impact layers must not reference plugin forms");
 			const auto id = String(*table, "id");
+			if (id == "Wave") {
+				Require(!legacyWave, "Duplicate retired native impact layer");
+				legacyWave = true;
+				continue;
+			}
 			const auto found = std::find(nativeLayerNames.begin(), nativeLayerNames.end(), id);
 			Require(found != nativeLayerNames.end(), "Unknown native impact layer");
 			NativeRoute route;

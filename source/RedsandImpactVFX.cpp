@@ -295,20 +295,16 @@ namespace RedsandImpactVFX
 			const bool blocked = hit.flags.any(RE::HitData::Flag::kBlocked, RE::HitData::Flag::kBlockWithWeapon);
 			const bool bash = hit.flags.any(RE::HitData::Flag::kBash, RE::HitData::Flag::kTimedBash);
             if (blocked && !bash) RedsandBlockLightning::Notify(precise.target, precise.attacker, precise.hitPos);
-			const bool blockedOrBash = hit.flags.any(RE::HitData::Flag::kBlocked, RE::HitData::Flag::kBlockWithWeapon,
-				RE::HitData::Flag::kBash, RE::HitData::Flag::kTimedBash);
-			const bool power = hit.flags.any(RE::HitData::Flag::kPowerAttack);
-			const bool critical = hit.flags.any(RE::HitData::Flag::kCritical, RE::HitData::Flag::kCriticalOnDeath);
-			const auto layers = SelectNativeHitLayers(actor != nullptr, physicalMelee, blockedOrBash, blade, false,
-				precise.attacker->IsPlayerRef(), power, critical, config);
+			const bool blockedOrBash = blocked || bash;
+			const auto layers = SelectNativeHitLayers(actor != nullptr, physicalMelee, blockedOrBash, blade, config);
 			const bool block = actor && SelectNativeBlock(physicalMelee, blocked, bash, config);
 			static unsigned observed = 0;
 			if (observed < 6) {
-				logger::info("Redsand native hit {}: attacker={:X} target={:X} blockedOrBash={} power={} critical={} layers={}/{}/{}/{}",
+				logger::info("Redsand native hit {}: attacker={:X} target={:X} blockedOrBash={} layers={}/{}/{}",
 					++observed, precise.attacker->GetFormID(), precise.target->GetFormID(), blockedOrBash,
-					power, critical, layers.fallbackHit, layers.slash, layers.refraction, block);
+					layers.fallbackHit, layers.slash, block);
 			}
-			if (!layers.fallbackHit && !layers.slash && !layers.refraction && !block) { return; }
+			if (!layers.fallbackHit && !layers.slash && !block) { return; }
 			const auto frame = RedsandSlash::BuildFrame(FromNi(precise.hitPointVelocity),
 				CapsuleWorldAxis(precise.hittingRigidBody), FromNi(precise.separatingNormal));
 			auto* cell = precise.target->GetParentCell();
@@ -322,7 +318,6 @@ namespace RedsandImpactVFX
 				(RedsandSlashRandom::attackSeed ? RedsandSlashRandom::attackSeed : RedsandSlashRandom::NextSeed()) : RedsandSlashRandom::attackSeed;
 			RedsandSlashRandom::AttackScope contactColor(colorSeed);
 			if (layers.fallbackHit) { SpawnNativeLayer(NativeLayer::Hit, config, cell, basis, precise.hitPos, slashColor); }
-			if (layers.refraction) { SpawnNativeLayer(NativeLayer::Wave, config, cell, basis, precise.hitPos); }
 			if (layers.slash) {
 				auto* effect = SpawnNativeLayer(NativeLayer::Slash, config, cell, basis, precise.hitPos);
 				std::lock_guard lock(statusLock);
@@ -482,8 +477,7 @@ namespace RedsandImpactVFX
 					routes.push_back(std::move(live));
 					++next.resolved;
 				}
-				if (NativeRouteFor(NativeLayer::Slash) || NativeRouteFor(NativeLayer::Hit) ||
-					NativeRouteFor(NativeLayer::Wave) || NativeRouteFor(NativeLayer::Block)) {
+				if (NativeRouteFor(NativeLayer::Slash) || NativeRouteFor(NativeLayer::Hit) || NativeRouteFor(NativeLayer::Block)) {
 					next.slashCallback = PrecisionHandler::GetSingleton()->AddPostHitCallback(SKSE::GetPluginHandle(), OnPostHit);
 					if (!next.slashCallback) { next.detail = "Native melee/block callback registration failed"; }
 				}

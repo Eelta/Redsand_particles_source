@@ -80,9 +80,9 @@ def config_xml():
             sub(sub(plugin, 'typeDescriptor'), 'type', name='Recommended' if index == 0 else 'Optional')
     combat = sub(steps, 'installStep', name='Combat effects / 战斗特效组件')
     for flag, caption, description in [
-        ('hit', 'Hit sparks and impact waves / 命中火花与冲击波', 'Impact sparks and power/critical-hit waves.\n命中火花，以及重击、暴击时的冲击效果。'),
+        ('hit', 'Hit sparks / 命中火花', 'Impact sparks.\n命中火花。'),
         ('slash', 'Slash light and sparks / 斩光与火花', 'Slash light and sparks following the weapon swing.\n沿挥刀方向显示斩光与飞溅火花。'),
-        ('block', 'Block flashes and sparks / 格挡闪光与火花', 'Block flashes and sparks; does not add timed-block gameplay.\n格挡闪光与火花，不添加限时格挡玩法。')]:
+        ('block', 'Block flashes and sparks / 格挡闪光与火花', 'Block flashes, sparks, and optional lightning.\n格挡闪光、火花和可选闪电。')]:
         group(combat, caption, flag, [
             ('on', 'Enable / 启用', description),
             ('off', 'Disable / 关闭', 'Start with this effect disabled.\n初始关闭此效果。')])

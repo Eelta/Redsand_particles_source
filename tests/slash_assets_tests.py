@@ -1,71 +1,53 @@
-
 from pathlib import Path
-import copy
-import json
-import math
 import struct
 import sys
 import unittest
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / 'tools'))
-from optimize_slash_assets import SlashNif, closure, compact, graph_signature, SECONDARY, optimize
+from optimize_slash_assets import closure, compact
+from prune_impact_layers import ImpactNif, graph_descendants, node_name
 
 
-class SlashAssetsTests(unittest.TestCase):
-    def test_shared_model_preserves_artwork_motion_fade_and_core_emission(self):
-        golden = json.loads((ROOT / 'tests/fixtures/slash-pre-optimization-graphs.json').read_text('utf-8'))
-        assets = ROOT / 'assets/ImpactVFX/Meshes/StellarImpact'
-        current = {p.relative_to(assets).as_posix(): p for p in assets.rglob('GoldBladeSlash.nif')}
-        self.assertEqual(set(current), set(golden))
-        self.assertEqual(len(current), 1)
-        for name, path in current.items():
-            with self.subTest(model=name):
-                doc = SlashNif.read(path)
-                doc.validate()
-                self.assertEqual(len(doc.blocks), 510)
-                self.assertEqual(len(closure(doc)[0]), 510)
-                restored = copy.deepcopy(doc)
-                changed = []
-                for index in doc.indices('NiParticleSystem'):
-                    fields = doc.fields(index)
-                    system = doc.string(fields['name'].value)
-                    if system not in SECONDARY:
-                        continue
-                    changed.append(system)
-                    controller = fields['controller'].value
-                    while controller != -1:
-                        control = doc.fields(controller)
-                        if doc.blocks[controller].type == 'NiPSysEmitterCtlr':
-                            curve = doc.fields(control['interpolator'].value)['data'].value
-                            rate = doc.fields(curve)['keys']
-                            for key, (time, value) in enumerate(rate.value):
-                                struct.pack_into('<f', restored.blocks[curve].data, rate.offset + key * 8 + 4, value * 2.)
-                            births = sum((b[0]-a[0])*(b[1]+a[1])*.5 for a,b in zip(rate.value, rate.value[1:])) * 100.
-                        controller = control['next_controller'].value
-                    data = fields['data'].value
-                    capacity = doc.fields(data)['max_particles']
-                    self.assertGreaterEqual(capacity.value, math.ceil(births) + 2)
-                    struct.pack_into('<H', restored.blocks[data].data, capacity.offset, capacity.value * 2)
-                self.assertEqual(len(changed), 6)
+MESHES = ROOT / 'assets/ImpactVFX/Meshes/StellarImpact'
 
 
+class ImpactAssetsTests(unittest.TestCase):
+    def test_cut_keeps_one_pointed_shape_and_its_fade(self):
+        doc = ImpactNif.read(MESHES / 'Slash/GoldBladeSlash.nif')
+        self.assertEqual(len(closure(doc)[0]), len(doc.blocks))
+        self.assertFalse(any('PSys' in block.type for block in doc.blocks))
+        shape, = doc.indices('BSTriShape')
+        geometry = doc.values(shape)
+        self.assertEqual(node_name(doc, shape), 'White hot blade contact')
+        self.assertIn('RSRGBCutLength_v1', {node_name(doc, i) for i in graph_descendants(doc, doc.roots)})
+        self.assertEqual(doc.values(geometry['shader'])['name'], doc.strings.index('RSRGBv1_4'))
+        self.assertGreaterEqual(doc.values(geometry['shader'])['controller'], 0)
+        vertices = geometry['vertices']
+        for x in (min(v[0] for v in vertices), max(v[0] for v in vertices)):
+            self.assertTrue(all(v[1:3] == (0., 0.) for v in vertices if v[0] == x))
+        self.assertTrue(any(v[0] == 0 and v[1] != 0 for v in vertices))
 
+    def test_hit_and_block_sparks_have_no_round_layers(self):
+        meshes = [*(MESHES / 'Hit').glob('*.nif'), *(MESHES / 'Block').glob('*.nif')]
+        for path in sorted(meshes):
+            with self.subTest(model=path.name):
+                doc = ImpactNif.read(path)
+                self.assertEqual(len(closure(doc)[0]), len(doc.blocks))
+                names = {node_name(doc, i).lower() for i in graph_descendants(doc, doc.roots)}
+                self.assertFalse(any('corona' in name or name in {'torus01', 'circle01', 'flash02', 'penblight'} for name in names))
+                self.assertTrue(doc.indices('NiParticleSystem'))
+                self.assertFalse(any('corona' in texture.lower() for texture in doc.texture_paths()))
 
-                self.assertEqual(graph_signature(restored), golden[name])
-                with self.assertRaises(ValueError):
-                    optimize(doc)
-
-    def test_unknown_unreachable_data_and_dangling_references_fail_closed(self):
-        doc = SlashNif.read(next((ROOT / 'assets/ImpactVFX').rglob('GoldBladeSlash.nif')))
-        unknown = copy.deepcopy(doc)
+    def test_compaction_rejects_unknown_or_dangling_data(self):
+        path = MESHES / 'Slash/GoldBladeSlash.nif'
+        unknown = ImpactNif.read(path)
         unknown.blocks[-1].type = 'UnknownPotentialReferenceBlock'
         with self.assertRaises(NotImplementedError):
             compact(unknown)
-        bad = copy.deepcopy(doc)
+        bad = ImpactNif.read(path)
         root = bad.blocks[bad.roots[0]]
-        offset = bad.fields(root.index)['children'].offset
-        struct.pack_into('<i', root.data, offset, len(bad.blocks))
+        struct.pack_into('<i', root.data, bad.fields(root.index)['children'].offset, len(bad.blocks))
         with self.assertRaises(ValueError):
             compact(bad)
 

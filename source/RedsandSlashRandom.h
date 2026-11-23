@@ -74,26 +74,20 @@ namespace RedsandSlashRandom
 				const auto hit = static_cast<unsigned>(RedsandSettings::ColorTarget::Hit);
 				result.colors[hit] = { true, color };
 			}
-			for (const auto target : { RedsandSettings::ColorTarget::SlashSparks, RedsandSettings::ColorTarget::Cut }) {
-				const auto index = static_cast<unsigned>(target);
-				result.colors[index].rgb = color;
-				result.colors[index].custom = true;
-			}
+			result.colors[static_cast<unsigned>(RedsandSettings::ColorTarget::Cut)] = { true, color };
 		}
 		if (base.slashRandomValues) {
 			Generator random{ seed ^ 0x5a17c9e3u };
 			const float range = std::isfinite(base.slashRandomRange) ? std::clamp(base.slashRandomRange, 0.f, 1.f) : .5f;
 			auto factor = [&] { return 1.f + (random.Unit() * 2.f - 1.f) * range; };
 			auto vary = [&](float value, float low, float high) { return std::clamp(value * factor(), low, high); };
-			result.impactSize = vary(base.impactSize, RedsandSettings::minSize, RedsandSettings::maxSize);
-			result.cutLength = vary(base.cutLength, RedsandSettings::minCutLength, RedsandSettings::maxCutLength);
-			result.slashDistance = vary(base.slashDistance, RedsandSettings::minSlashDistance, RedsandSettings::maxSlashDistance);
-			result.slashSpread = vary(base.slashSpread, 0.f, RedsandSettings::maxSlashSpread);
-			const float count = factor();
-			result.slashDensity = std::clamp(base.slashDensity * count, 0.f, RedsandSettings::maxSlashDensity);
-
-
-			if (slashContact) { result.impactDensity = std::clamp(base.impactDensity * count, 0.f, RedsandSettings::maxDensity); }
+			if (slashContact) {
+				result.hitSize = vary(base.hitSize, RedsandSettings::minSize, RedsandSettings::maxSize);
+				result.hitDensity = vary(base.hitDensity, 0.f, RedsandSettings::maxDensity);
+			} else {
+				result.impactSize = vary(base.impactSize, RedsandSettings::minSize, RedsandSettings::maxSize);
+				result.cutLength = vary(base.cutLength, RedsandSettings::minCutLength, RedsandSettings::maxCutLength);
+			}
 		}
 		return result;
 	}

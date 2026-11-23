@@ -40,6 +40,7 @@ struct AttackTrail
 	~AttackTrail();
 	bool ShouldAddPrecisionTrail() const;
 	void RetireRedsandNativeTrail();
+	void RetireRedsandSwingTrail() { bActive = false; }
 	bool Update(float a_deltaTime)
 	{
 #include "../source/NativeTrailUpdate.inc"
@@ -231,6 +232,21 @@ int main()
             RedsandSettings::current={};
         }
 		RegistrationKeepsTwoVisualsWithoutRecursion();
+		auto& trails = PrecisionHandler::GetSingleton()->_attackTrails;
+		trails.clear();
+		RedsandSettings::current = {};
+		RedsandSettings::current.swordReleasedTrail = true;
+		RedsandSettings::current.swordKeepPrecisionTrail = true;
+		selectedParticle = scopeAllowed = true;
+		auto first = std::make_shared<Node>();
+		auto second = std::make_shared<Node>();
+		int item = 1;
+		Register(first, {first.get()}, 1, &item, false);
+		Register(second, {first.get()}, 1, &item, false);
+		Check(trails.size() == 2 && trails[0]->redsandReleasedSelected && trails[1]->redsandReleasedSelected &&
+			trails[0]->collisionNode == first.get() && trails[1]->collisionNode == second.get(),
+			"each active collision should register one Redsand trail without an additional native ribbon");
+		trails.clear();
 		NativeOnlyLifecycleIsBoundedAndSwitchable();
 		NativeOverrideDoesNotInheritParticleOnlyDefinition();
 		std::cout << "Independent Precision ribbon registration, selection and lifecycle passed\n";

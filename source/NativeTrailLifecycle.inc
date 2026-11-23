@@ -1,6 +1,7 @@
 AttackTrail::~AttackTrail()
 {
 	if (redsandNativeOnly) { RetireRedsandNativeTrail(); }
+	if (redsandReleasedSelected) { RetireRedsandSwingTrail(); }
 }
 
 bool AttackTrail::ShouldAddPrecisionTrail() const

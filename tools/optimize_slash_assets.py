@@ -30,9 +30,9 @@ def references(fields):
             yield from field.value if isinstance(field.value, tuple) else (field.value,)
 
 
-def closure(doc):
+def closure(doc, *, reachable_only=False):
 
-    fields = {block.index: doc.fields(block.index) for block in doc.blocks}
+    fields = {} if reachable_only else {block.index: doc.fields(block.index) for block in doc.blocks}
     for parsed in fields.values():
         if any(ref < -1 or ref >= len(doc.blocks) for ref in references(parsed)):
             raise ValueError('Invalid block reference')
@@ -41,13 +41,17 @@ def closure(doc):
         index = pending.pop()
         if index == -1 or index in seen:
             continue
+        if not 0 <= index < len(doc.blocks):
+            raise ValueError('Invalid block reference')
         seen.add(index)
+        if index not in fields:
+            fields[index] = doc.fields(index)
         pending.extend(references(fields[index]))
     return sorted(seen), fields
 
 
-def compact(doc):
-    kept, fields = closure(doc)
+def compact(doc, *, reachable_only=False):
+    kept, fields = closure(doc, reachable_only=reachable_only)
     remap = {old: new for new, old in enumerate(kept)}
     result = copy.deepcopy(doc)
     result.blocks = [result.blocks[index] for index in kept]

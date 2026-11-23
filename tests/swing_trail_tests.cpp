@@ -12,10 +12,40 @@ int main() try
     Simulation simulation;
     const auto pose=[](float angle) { return Pose{{0,0,0},{std::sin(angle)*100.f,std::cos(angle)*100.f,0}}; };
     const auto sample=[&](Simulation& sim,float angle,float dt) { const auto p=pose(angle);sim.Sample(p.base,p.tip,dt,parameters); };
+    const auto compact = CompactStroke(Parameters{});
+    Simulation continuous;
+    continuous.Seed(pose(2.50f));
+    float angle = 2.50f;
+    for (unsigned frame = 0; frame < 240; ++frame) {
+        continuous.AdvanceFrame(.008f);
+        angle += frame < 80 ? -.25f : .29f;
+        const auto current = pose(angle);
+        continuous.Sample(current.base, current.tip, .008f, compact);
+        Check(std::ranges::any_of(continuous.Particles(), [&](const Particle& particle) {
+            return particle.ribbon && particle.age == 0.f && (particle.position - current.tip).Length() < .001f;
+        }), "a long or reversing stroke lost its current tip");
+        Check(continuous.Particles().size() < Simulation::capacity, "continuous movement exhausted the vertex buffer");
+    }
+    continuous.Advance(.5f);
+    const auto idle = pose(angle);
+    for (int n = 0; n < 4; ++n) { continuous.Sample(idle.base, idle.tip, .016f, compact); }
+    Check(continuous.Empty(), "a stationary weapon emitted a trail");
+    const auto resumed = pose(angle + .0002f);
+    continuous.Sample(resumed.base, resumed.tip, .016f, compact);
+    Check(continuous.Particles().size() == 2 && continuous.Particles()[0].ribbon &&
+        !continuous.Particles()[1].ribbon && continuous.Particles()[0].age == continuous.Particles()[1].age,
+        "the first moving frame after a pause lost its arc or spark");
+    const auto firstAlpha = continuous.Particles().front().Alpha();
+    continuous.EndAttack();
+    continuous.AdvanceFrame(.5f);
+    Check(!continuous.Empty() && continuous.Particles().front().Alpha() == firstAlpha,
+        "a stopped swing cut its fade on a stalled frame");
+    for (int n = 0; n < 30; ++n) { continuous.AdvanceFrame(.016f); }
+    Check(continuous.Empty(), "a stopped swing did not finish its particle fade");
     sample(simulation,0.f,.016f);sample(simulation,.4f,.016f);
     Check(!simulation.Empty(),"current movement waited for a future frame");
-    float nearest=1000.f;for(const auto& p:simulation.Particles())if(p.ribbon && p.intensity==.85f)nearest=std::min(nearest,(p.position-pose(.4f).tip*.94f).Length());
-    Check(nearest<.75f,"visible arc head trails behind the current weapon pose");
+    float nearest=1000.f;for(const auto& p:simulation.Particles())if(p.ribbon && p.intensity==.85f)nearest=std::min(nearest,(p.position-pose(.4f).tip).Length());
+    Check(nearest<.001f,"visible arc head trails behind the current weapon pose");
     sample(simulation,.8f,.016f);
     bool core=false,grains=false;
     for (const auto& p:simulation.Particles()) {
@@ -38,7 +68,7 @@ int main() try
     const auto initial=simulation.Particles().front().position;
     for(unsigned i=0;i<9;++i) {simulation.Advance(.016f);sample(simulation,.9f+i*.1f,.016f);}
     Check((simulation.Particles().front().position-initial).Length()<.0001f,"retained arc followed later weapon motion");
-    Check(simulation.Particles().front().age==0.f,"front of the arc disappeared before the swing ended");
+    Check(simulation.Particles().front().age > .12f,"the visible trail did not retain its earlier samples");
     const auto beforeFlush=simulation.Particles().size();simulation.Break();
     Check(simulation.Particles().size()==beforeFlush,"swing end emitted a stale buffered segment");
     simulation.Advance(.04f);
@@ -58,7 +88,7 @@ int main() try
     curved.Break();std::vector<Vec3> middle;
     for(const auto& p:curved.Particles()) {
         if(p.ribbon && p.intensity==.85f) {
-            Check(std::abs(p.position.Length()-94.f)<.03f,"curve collapsed inward into endpoint chords");middle.push_back(p.position);
+            Check(std::abs(p.position.Length()-100.f)<.03f,"curve collapsed inward into endpoint chords");middle.push_back(p.position);
         }
     }
     for(std::size_t i=2;i<middle.size();++i) {

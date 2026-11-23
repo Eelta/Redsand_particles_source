@@ -8,7 +8,6 @@
 #include <RE/N/NiFloatExtraData.h>
 #include <RE/N/NiFloatInterpolator.h>
 #include <RE/N/NiFloatData.h>
-#include <RE/N/NiInterpController.h>
 #include <RE/N/NiControllerManager.h>
 #include <RE/N/NiControllerSequence.h>
 #include <array>
@@ -24,8 +23,17 @@ namespace RedsandAppearance
 		REL::Relocation<UpdateFunction> downward, selected, rigid;
 		using FloatUpdate = bool (*)(RE::NiFloatInterpolator*, float, RE::NiObjectNET*, float&);
 		REL::Relocation<FloatUpdate> floatUpdate;
-		using RenderFunction = RE::BSShaderProperty::RenderPassArray* (*)(RE::BSEffectShaderProperty*, RE::BSGeometry*, std::uint32_t, RE::BSShaderAccumulator*);
-		REL::Relocation<RenderFunction> renderPasses;
+		RE::BSEffectShaderProperty* EffectShader(RE::BSGeometry* geometry)
+		{
+			return geometry ? netimmerse_cast<RE::BSEffectShaderProperty*>(geometry->GetGeometryRuntimeData().shaderProperty.get()) : nullptr;
+		}
+
+		std::optional<RedsandSettings::ColorTarget> ShaderGroup(const RE::BSEffectShaderProperty* shader)
+		{
+			const auto* name = shader ? shader->name.c_str() : nullptr;
+			return name ? Group(name) : std::nullopt;
+		}
+
 		const RE::BSFixedString& RateName()
 		{
 			static const RE::BSFixedString name{ "RSAttackRate_v1" };
@@ -40,13 +48,11 @@ namespace RedsandAppearance
 				auto* k0 = data->keys;
 				auto* k1 = k0->GetKeyAt(1, data->keySize);
 				auto* k2 = k0->GetKeyAt(2, data->keySize);
-				if (OwnedSlashRateCurve(k0->GetTime(), k0->GetValue(), k1->GetTime(), k1->GetValue(), k2->GetTime(), k2->GetValue())) {
-					const auto* rate = target ? netimmerse_cast<RE::NiFloatExtraData*>(target->GetExtraData(RateName())) : nullptr;
-					value *= rate ? rate->value : SlashDensity(RedsandSlashRandom::appearance ? *RedsandSlashRandom::appearance : RedsandSettings::Get());
-				} else if (OwnedRateCurve(k0->GetTime(), k0->GetValue(), k1->GetTime(), k1->GetValue(), k2->GetTime(), k2->GetValue())) {
+				if (OwnedRateCurve(k0->GetTime(), k0->GetValue(), k1->GetTime(), k1->GetValue(), k2->GetTime(), k2->GetValue())) {
 					const auto* rate = target ? netimmerse_cast<RE::NiFloatExtraData*>(target->GetExtraData(RateName())) : nullptr;
 					const auto config = RedsandSlashRandom::appearance ? *RedsandSlashRandom::appearance : RedsandSettings::Get();
-					value *= rate ? rate->value : config.impactDensity * RedsandSettings::impactDensityBaseline;
+					const auto group = ShaderGroup(EffectShader(netimmerse_cast<RE::BSGeometry*>(target)));
+					value *= rate ? rate->value : RateFactor(config, group.value_or(RedsandSettings::ColorTarget::Block));
 				}
 			}
 			return result;
@@ -70,8 +76,6 @@ namespace RedsandAppearance
 			});
 		}
 
-#include "SlashEmitterControls.inc"
-
 		RedsandSettings::Config ForRoot(RE::NiNode* root)
 		{
 			const auto base = RedsandSettings::Get();
@@ -94,7 +98,7 @@ namespace RedsandAppearance
 			return value ? RedsandSlashRandom::Sample(base, value->value, value->contact) : base;
 		}
 
-		void Tint(RE::BSGeometry* geometry, const RedsandSettings::Config& config, bool prepareRates = true);
+		std::optional<RedsandSettings::ColorTarget> Tint(RE::BSGeometry* geometry, const RedsandSettings::Config& config);
 		void Scale(RE::NiNode* root, const RedsandSettings::Config& config)
 		{
 			if (!Owned(root)) { return; }
@@ -105,7 +109,7 @@ namespace RedsandAppearance
 				if (!extra || !root->AddExtraData(extra.get())) { return; }
 				marker = extra.get();
 			}
-			root->local.scale = marker->value * config.impactSize;
+			bool isHit = false;
 			std::array<RE::NiAVObject*, 128> pending{}, visited{};
 			unsigned count = 1, done = 0;
 			pending[0] = root;
@@ -117,25 +121,21 @@ namespace RedsandAppearance
 					for (const auto& child : node->children) { if (child && count < pending.size()) { pending[count++] = child.get(); } }
 				}
 				if (auto* geometry = netimmerse_cast<RE::BSGeometry*>(object)) {
-					UpdateSlashSpeed(geometry, config);
-					Tint(geometry, config);
+					isHit |= Tint(geometry, config) == RedsandSettings::ColorTarget::Hit;
 				}
 			}
+			root->local.scale = marker->value * (isHit ? config.hitSize : config.impactSize);
 		}
 
-		void Tint(RE::BSGeometry* geometry, const RedsandSettings::Config& config, bool prepareRates)
+		std::optional<RedsandSettings::ColorTarget> Tint(RE::BSGeometry* geometry, const RedsandSettings::Config& config)
 		{
-			auto* shader = netimmerse_cast<RE::BSEffectShaderProperty*>(geometry->GetGeometryRuntimeData().shaderProperty.get());
-			if (!shader) { return; }
-			const auto* shaderName = shader->name.c_str();
-			if (!shaderName) { return; }
-			const auto group = Group(shaderName);
-			if (!group) { return; }
+			auto* shader = EffectShader(geometry);
+			const auto group = ShaderGroup(shader);
+			if (!group) { return {}; }
 
-
-			auto* rate = prepareRates ? netimmerse_cast<RE::NiFloatExtraData*>(geometry->GetExtraData(RateName())) : nullptr;
-			if (prepareRates && (rate || config.slashRandomValues)) {
-				const auto factor = *group == RedsandSettings::ColorTarget::SlashSparks ? SlashDensity(config) : config.impactDensity * RedsandSettings::impactDensityBaseline;
+			auto* rate = netimmerse_cast<RE::NiFloatExtraData*>(geometry->GetExtraData(RateName()));
+			if (rate || config.slashRandomValues) {
+				const auto factor = RateFactor(config, *group);
 				if (rate) { rate->value = factor; }
 				else {
 					RE::NiPointer<RE::NiFloatExtraData> extra{ RE::NiFloatExtraData::Create(RateName(), factor) };
@@ -143,13 +143,13 @@ namespace RedsandAppearance
 				}
 			}
 			auto* material = shader->GetMaterial();
-			if (!material) { return; }
+			if (!material) { return group; }
 			static const RE::BSFixedString markerName{ "RSRGBPeak_v1" };
 			auto* marker = netimmerse_cast<RE::NiFloatExtraData*>(geometry->GetExtraData(markerName));
 			if (!marker) {
 				const auto peak = std::max({ material->baseColor.red, material->baseColor.green, material->baseColor.blue, 0.f });
 				RE::NiPointer<RE::NiFloatExtraData> owned{ RE::NiFloatExtraData::Create(markerName, -std::max(peak, .0001f)) };
-				if (!owned || !geometry->AddExtraData(owned.get())) { return; }
+				if (!owned || !geometry->AddExtraData(owned.get())) { return group; }
 				marker = owned.get();
 			}
 			const auto& rgb = Color(config, *group);
@@ -162,50 +162,19 @@ namespace RedsandAppearance
 					RE::NiPointer<RE::NiFloatExtraData> extra{ RE::NiFloatExtraData::Create(glowName, material->baseColorScale) };
 					if (extra && geometry->AddExtraData(extra.get())) { glow = extra.get(); }
 				}
-				if (glow) { wantedGlow = GlowStrength(glow->value, shader->GetExtraData(originalGlowName) != nullptr, config); }
+				if (glow) { wantedGlow = GlowStrength(glow->value, shader->GetExtraData(originalGlowName) != nullptr, config, *group); }
 			}
 			if (!RedsandMaterialColor::Commit(shader, material, { rgb[0] * peak, rgb[1] * peak, rgb[2] * peak },
-				wantedGlow, marker->value < 0.f, [](auto* copy) { copy->~BSEffectShaderMaterial(); RE::free(copy); })) { return; }
+				wantedGlow, marker->value < 0.f, [](auto* copy) { copy->~BSEffectShaderMaterial(); RE::free(copy); })) { return group; }
 			marker->value = peak;
-			static std::array<std::atomic<unsigned>, 7> appliedLogs{};
+			static std::array<std::atomic<unsigned>, static_cast<unsigned>(RedsandSettings::ColorTarget::Count)> appliedLogs{};
 			auto& groupLogs = appliedLogs[static_cast<unsigned>(*group)];
 			if (groupLogs.load(std::memory_order_relaxed) < 6 && groupLogs.fetch_add(1, std::memory_order_relaxed) < 6) {
 				logger::info("Redsand rendered owned VFX: node={} group={} rgb={}/{}/{} glow={} alpha={} scale={}",
 					geometry->name.c_str(), static_cast<unsigned>(*group), material->baseColor.red, material->baseColor.green,
 					material->baseColor.blue, material->baseColorScale, material->baseColor.alpha, geometry->world.scale);
 			}
-		}
-
-		RE::BSShaderProperty::RenderPassArray* RenderPasses(RE::BSEffectShaderProperty* shader, RE::BSGeometry* geometry,
-			std::uint32_t mode, RE::BSShaderAccumulator* accumulator)
-		{
-
-
-
-			if (geometry && shader->name == "RSRGBv1_2"sv && geometry->GetGeometryRuntimeData().shaderProperty.get() == shader) {
-				const auto base = RedsandSettings::Get();
-				if (base.slashRandomColor) {
-					auto* parent = geometry->parent;
-					for (unsigned depth = 0; parent && depth < 32; ++depth, parent = parent->parent) {
-						if (!Owned(parent)) { continue; }
-						RedsandImpactVFX::BindRandomSlashRoot(parent);
-						static const RE::BSFixedString seedName{ "RSRandomSlashSeed_v1" };
-						const auto* extra = netimmerse_cast<RE::NiFloatExtraData*>(parent->GetExtraData(seedName));
-						const auto seed = extra ? RedsandSlashRandom::ReadSceneSeed(extra->value) : std::nullopt;
-						if (seed && seed->contact) {
-							Tint(geometry, RedsandSlashRandom::Sample(base, seed->value, true), false);
-							static std::atomic<unsigned> logs{ 0 };
-							if (logs.load(std::memory_order_relaxed) < 6 && logs.fetch_add(1, std::memory_order_relaxed) < 6) {
-								const auto* material = shader->GetMaterial();
-								if (material) { logger::info("Redsand paired-hit draw: seed={} rgb={}/{}/{}", seed->value,
-									material->baseColor.red, material->baseColor.green, material->baseColor.blue); }
-							}
-						}
-						break;
-					}
-				}
-			}
-			return renderPasses(shader, geometry, mode, accumulator);
+			return group;
 		}
 
 		void Apply(RE::NiNode* root, const RedsandSettings::Config& config)
@@ -227,6 +196,8 @@ namespace RedsandAppearance
 
 						node->local.rotate = RE::NiMatrix3{};
 						node->local.rotate.entry[0][0] = config.cutLength * RedsandSettings::cutLengthBaseline;
+						node->local.rotate.entry[1][1] = config.cutWidth;
+						node->local.rotate.entry[2][2] = config.cutWidth;
 					}
 					for (const auto& child : node->children) { if (child && count < pending.size()) { pending[count++] = child.get(); } }
 				}
@@ -264,8 +235,6 @@ namespace RedsandAppearance
 			rigid = table.write_vfunc(0x2E, Rigid);
 			REL::Relocation<std::uintptr_t> floats{ RE::VTABLE_NiFloatInterpolator[0] };
 			floatUpdate = floats.write_vfunc(0x29, UpdateFloat);
-			REL::Relocation<std::uintptr_t> effects{ RE::VTABLE_BSEffectShaderProperty[0] };
-			renderPasses = effects.write_vfunc(0x2A, RenderPasses);
 			logger::info("Redsand continuous VFX controls installed: brightness=0..20 density=0..10 size=.05..10; tagged curve outputs only");
 		});
 	}

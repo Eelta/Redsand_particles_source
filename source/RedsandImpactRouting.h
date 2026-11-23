@@ -15,8 +15,10 @@ namespace RedsandImpactVFX
 {
 	enum class Category { Hit, Slash, Block };
 	enum class Kind { Impact, Explosion, Projectile };
-	enum class NativeLayer : unsigned { Hit, Stone, Slash, Block, Wave, Count };
-	inline constexpr std::array<std::string_view, 5> nativeLayerNames{ "Hit", "Stone", "Slash", "Block", "Wave" };
+	enum class NativeLayer : unsigned { Hit, Stone, Slash, Block, Count };
+	inline constexpr std::array<std::string_view, static_cast<unsigned>(NativeLayer::Count)> nativeLayerNames{
+		"Hit", "Stone", "Slash", "Block"
+	};
 	inline constexpr std::array<std::string_view, static_cast<unsigned>(RedsandSettings::BlockStyle::Count)> blockStyleModelNames{
 		"NormalBlock.nif", "TimedSparks.nif", "TimedFlare.nif", "PerfectRing.nif", "SimpleTimed.nif", "StarRing.nif"
 	};
@@ -121,14 +123,12 @@ namespace RedsandImpactVFX
 			category == Category::Slash ? config.impactSlash : config.impactBlock);
 	}
 
-	struct NativeHitLayers { bool fallbackHit = false; bool slash = false; bool refraction = false; };
+	struct NativeHitLayers { bool fallbackHit = false; bool slash = false; };
 	inline NativeHitLayers SelectNativeHitLayers(bool actorTarget, bool physicalMelee, bool blockedOrBash,
-		bool blade, bool, bool, bool power, bool critical, const RedsandSettings::Config& config)
+		bool blade, const RedsandSettings::Config& config)
 	{
 		if (!actorTarget || !physicalMelee || blockedOrBash) { return {}; }
-		return { Enabled(Category::Hit, config),
-			Enabled(Category::Slash, config) && blade,
-			Enabled(Category::Hit, config) && (power || critical) };
+		return { Enabled(Category::Hit, config), Enabled(Category::Slash, config) && blade };
 	}
 	inline bool SelectNativeBlock(bool physicalMelee, bool blocked, bool bash, const RedsandSettings::Config& config)
 	{
