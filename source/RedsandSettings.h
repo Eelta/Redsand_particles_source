@@ -1,6 +1,7 @@
 #pragma once
 
 #include <filesystem>
+#include <algorithm>
 #include <array>
 #include <map>
 #include <memory>
@@ -10,12 +11,16 @@
 namespace RedsandSettings
 {
 	enum class Language { English = 0, Chinese = 1 };
-	enum class BlockStyle : unsigned { NormalBlock, TimedSparks, TimedFlare, PerfectRing, SimpleTimed, StarRing, Count };
 
 	inline constexpr float maxBrightness = 20.0f;
 	inline constexpr float maxDensity = 10.0f;
+	inline constexpr float maxRedsandDotDensity = maxDensity / .65f;
 	inline constexpr float defaultSpread = 1.0f;
 	inline constexpr float maxSpread = 10.0f;
+	inline constexpr float maxSwingParticleWidth = 10.f;
+	inline constexpr float defaultSwingSpeed = 1.f, maxSwingSpeed = 2.f;
+	inline constexpr float defaultRibbonWidth = .15f, maxRibbonWidthMultiplier = 2.f;
+	inline constexpr float minSwingDuration = .18f, maxSwingDuration = 2.7f;
 	inline constexpr float minSize = 0.05f;
 	inline constexpr float maxSize = 10.0f;
 	inline constexpr float minCutLength = 0.05f;
@@ -43,13 +48,23 @@ namespace RedsandSettings
 		EffectColor{ true, { 1.f, .72f, .24f } },
 		EffectColor{ true, { .835886f, .537747f, 0.f } }, EffectColor{ true, { 1.f, .72f, .24f } }
 	};
+	struct RedsandTrailStyle
+	{
+		float arcBrightness = 1.f, particleBrightness = 1.f;
+		float density = 1.f, size = 1.f;
+		bool player = true, npc = true;
+		EffectColor color = defaultColors[0];
+		bool operator==(const RedsandTrailStyle&) const = default;
+	};
 	struct EnchantmentAppearance
 	{
 		bool enabled = false;
 		EffectColor color{ false, { .0384615f, .123077f, 1.f } };
 		bool swordReleasedTrail = false;
-		float swordRibbonLifetime = .2f, swordParticleLifetime = .3f, swordRibbonWidth = .5f, swordTrailMomentum = .1f;
+		RedsandTrailStyle redsand;
+		float swordRibbonLifetime = .2f, swordParticleLifetime = .3f, swordRibbonWidth = defaultRibbonWidth, swordTrailMomentum = defaultSwingSpeed;
 		float swordRibbonFadeOut = .25f, swordParticleFadeOut = .4f, swordParticleGravity = .3f;
+		float swordParticleWidth = 0.f;
 		bool swordEnabled = true, swordPlayer = true, swordNPC = true, swordTip = true, swordKeepPrecisionTrail = true;
 		bool bowEnabled = true, bowPlayer = true, bowNPC = true, bowGathering = true, bowRings = true, bowTrails = true;
 		EffectColor bowColor{ false, { .0384615f, .123077f, 1.f } };
@@ -85,8 +100,10 @@ namespace RedsandSettings
 		Language language = Language::English;
 		bool diagnostics = false;
 		bool swordReleasedTrail = false;
-		float swordRibbonLifetime = .2f, swordParticleLifetime = .3f, swordRibbonWidth = .5f, swordTrailMomentum = .1f;
+		RedsandTrailStyle redsand;
+		float swordRibbonLifetime = .2f, swordParticleLifetime = .3f, swordRibbonWidth = defaultRibbonWidth, swordTrailMomentum = defaultSwingSpeed;
 		float swordRibbonFadeOut = .25f, swordParticleFadeOut = .4f, swordParticleGravity = .3f;
+		float swordParticleWidth = 0.f;
 		bool swordEnabled = true;
 		bool swordPlayer = true;
 		bool swordNPC = true;
@@ -111,7 +128,6 @@ namespace RedsandSettings
 		bool slashRandomValues = false;
 		float slashRandomRange = .5f;
 		bool impactBlock = true;
-		BlockStyle blockStyle = BlockStyle::NormalBlock;
         bool blockLightning = false;
         bool blockLightningRandomTrigger = true;
         bool blockLightningRandomColor = false;
@@ -133,6 +149,32 @@ namespace RedsandSettings
 
 		bool operator==(const Config&) const = default;
 	};
+	struct SwingTiming
+	{
+		float arcHold, arcFade, particleHold, particleFade;
+
+		static SwingTiming FromDuration(float seconds)
+		{
+			const float part = std::clamp(seconds, minSwingDuration, maxSwingDuration) / 9.f;
+			return {2.f * part, 3.f * part, 4.f * part, 5.f * part};
+		}
+	};
+	template <class Settings>
+	float SwingDuration(const Settings& settings)
+	{
+		return std::clamp(settings.swordParticleLifetime + settings.swordParticleFadeOut,
+			minSwingDuration, maxSwingDuration);
+	}
+	template <class Settings>
+	void SetSwingDuration(Settings& settings, float seconds)
+	{
+		const auto timing = SwingTiming::FromDuration(seconds);
+		settings.swordRibbonLifetime = timing.arcHold;
+		settings.swordRibbonFadeOut = timing.arcFade;
+		settings.swordParticleLifetime = timing.particleHold;
+		settings.swordParticleFadeOut = timing.particleFade;
+	}
+
 	inline const EnchantmentAppearance* AppearanceFor(const Config& config, std::string_view key, std::string_view fallback)
 	{
 		const auto* exact = config.enchantments.Find(key);
@@ -144,9 +186,11 @@ namespace RedsandSettings
 	{
 		if (const auto* appearance = AppearanceFor(config, key, fallback)) {
 			config.swordReleasedTrail = appearance->swordReleasedTrail;
+			config.redsand = appearance->redsand;
 			config.swordRibbonLifetime = appearance->swordRibbonLifetime; config.swordParticleLifetime = appearance->swordParticleLifetime;
 			config.swordRibbonFadeOut = appearance->swordRibbonFadeOut; config.swordParticleFadeOut = appearance->swordParticleFadeOut;
 			config.swordParticleGravity = appearance->swordParticleGravity;
+			config.swordParticleWidth = appearance->swordParticleWidth;
 			config.swordRibbonWidth = appearance->swordRibbonWidth; config.swordTrailMomentum = appearance->swordTrailMomentum;
 			config.swordEnabled = appearance->swordEnabled;
 			config.swordPlayer = appearance->swordPlayer; config.swordNPC = appearance->swordNPC;

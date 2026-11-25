@@ -70,56 +70,53 @@
     "baseline_sha256": "4d829880fb4b643bbb22ce73bf232f3ebc05922a918f2bdae10b6993a04791c2"
   },
   "Meshes/StellarImpact/Block/NormalBlock.nif": {
-    "sha256": "b56928dc786d79e11d35814bbb2329edfe633d95ce74ec625f62c39a825f5ce6",
+    "sha256": "b2f62b20a9cc13818a2a3e241e20763265d6860bec19313d2dc3987731aec900",
     "origin": "AP05 particle template plus Epsilona11 procedural geometry/material/animation changes; attribution/free-distribution conditions retained",
     "introduced_by": "assistant during subsequent maintenance",
-    "original_author_release": "Not attributed to the author's original Redsand release; later additions are the assistant's responsibility to audit"
+    "original_author_release": "Not attributed to the author's original Redsand release; later additions are the assistant's responsibility to audit",
+    "layer_change": "Removed round geometry and dependent controllers; retained sparks"
   },
   "Meshes/StellarImpact/Block/PerfectRing.nif": {
-    "sha256": "d636d5eaed825a037a4fe78941ceb32b34895f72641ebb333a8e83be54c857ed",
+    "sha256": "fdf90aaab63f63ca6b549cb5b1a0498e8b123992da4a2e2bdea37b1bae0bfffe",
     "origin": "AP05 particle template plus Epsilona11 procedural geometry/material/animation changes; attribution/free-distribution conditions retained",
     "introduced_by": "assistant during subsequent maintenance",
-    "original_author_release": "Not attributed to the author's original Redsand release; later additions are the assistant's responsibility to audit"
+    "original_author_release": "Not attributed to the author's original Redsand release; later additions are the assistant's responsibility to audit",
+    "layer_change": "Removed round geometry and dependent controllers; retained sparks"
   },
   "Meshes/StellarImpact/Block/SimpleTimed.nif": {
-    "sha256": "e2ffe21fcea5af3fd22103e0012f18c4dd622e89b68d40a3bb496e96700a7b05",
+    "sha256": "b79f1610205d859b6263c2deaf94e4a9e06fd2b50dff6135c05fa182d09e06bc",
     "origin": "AP05 particle template plus Epsilona11 procedural geometry/material/animation changes; attribution/free-distribution conditions retained",
     "introduced_by": "assistant during subsequent maintenance",
-    "original_author_release": "Not attributed to the author's original Redsand release; later additions are the assistant's responsibility to audit"
+    "original_author_release": "Not attributed to the author's original Redsand release; later additions are the assistant's responsibility to audit",
+    "layer_change": "Removed round geometry and dependent controllers; retained sparks"
   },
   "Meshes/StellarImpact/Block/TimedFlare.nif": {
-    "sha256": "d636d5eaed825a037a4fe78941ceb32b34895f72641ebb333a8e83be54c857ed",
+    "sha256": "fdf90aaab63f63ca6b549cb5b1a0498e8b123992da4a2e2bdea37b1bae0bfffe",
     "origin": "AP05 particle template plus Epsilona11 procedural geometry/material/animation changes; attribution/free-distribution conditions retained",
     "introduced_by": "assistant during subsequent maintenance",
-    "original_author_release": "Not attributed to the author's original Redsand release; later additions are the assistant's responsibility to audit"
+    "original_author_release": "Not attributed to the author's original Redsand release; later additions are the assistant's responsibility to audit",
+    "layer_change": "Removed round geometry and dependent controllers; retained sparks"
   },
   "Meshes/StellarImpact/Block/TimedSparks.nif": {
-    "sha256": "19a387bdc5db254058050dc2b816620a98c31bd841a20e32c8724fb9d069c99e",
+    "sha256": "eb10d35a68be94cd60a53e49fdb71eb1db3d796018f0cf0910510ce8796d4f5f",
     "origin": "AP05 particle template plus Epsilona11 procedural geometry/material/animation changes; attribution/free-distribution conditions retained",
     "introduced_by": "assistant during subsequent maintenance",
-    "original_author_release": "Not attributed to the author's original Redsand release; later additions are the assistant's responsibility to audit"
+    "original_author_release": "Not attributed to the author's original Redsand release; later additions are the assistant's responsibility to audit",
+    "layer_change": "Removed round geometry and dependent controllers; retained sparks"
   },
   "Meshes/StellarImpact/Hit/MetalBurst.nif": {
-    "sha256": "0f2f03627b7e75bd63891874e0e81a4b550ae5662955980238e20c61645b4be9",
+    "sha256": "08b6e7fd0609f8e6144ec21b08685db65665d1fe89d8372d11374f98c9d147f2",
     "origin": "AP05 particle template plus Epsilona11 procedural geometry/material/animation changes; attribution/free-distribution conditions retained",
     "introduced_by": "assistant during subsequent maintenance",
-    "original_author_release": "Not attributed to the author's original Redsand release; later additions are the assistant's responsibility to audit"
+    "original_author_release": "Not attributed to the author's original Redsand release; later additions are the assistant's responsibility to audit",
+    "layer_change": "Removed round geometry and dependent controllers; retained sparks"
   },
   "Meshes/StellarImpact/Hit/StoneBurst.nif": {
-    "sha256": "89a5f64a1b045cf257dbc8fc747964b3f951e393fe6f12eba9d399c1801145ad",
+    "sha256": "36542331adab57194f439e8b09a7f2acab0ea86b0414bffe13cf266831670980",
     "origin": "AP05 particle template plus Epsilona11 procedural geometry/material/animation changes; attribution/free-distribution conditions retained",
     "introduced_by": "assistant during subsequent maintenance",
-    "original_author_release": "Not attributed to the author's original Redsand release; later additions are the assistant's responsibility to audit"
-  },
-  "Meshes/StellarImpact/Refraction/SoftRefraction.nif": {
-    "sha256": "2dbc4dbe83da97014622ad726e79a7f43c5f011b2111b2cbcc1fb11b798054e4",
-    "origin": "Project-authored analytical refraction ellipsoid and emissive rings; independently generated without reading third-party models",
-    "generator": "tools/build_shockwave.py",
-    "reproducible_byte_identical": true,
-    "source_assets_read": false,
-    "license": "Project GPL-3.0",
-    "introduced_by": "assistant during publication remediation",
-    "supersedes": "Earlier Praisetheford/AP05 Refraction derivative; removed from the current release payload"
+    "original_author_release": "Not attributed to the author's original Redsand release; later additions are the assistant's responsibility to audit",
+    "layer_change": "Removed round geometry and dependent controllers; retained sparks"
   },
   "Meshes/StellarImpact/Slash/AzureCrescentSlash.nif": {
     "sha256": "a01ece19b4863ef2b89a6cc0d15a1eff300db1233c076bcaabe58ff65834e828",
@@ -128,11 +125,12 @@
     "original_author_release": "Not attributed to the author's original Redsand release; later additions are the assistant's responsibility to audit"
   },
   "Meshes/StellarImpact/Slash/GoldBladeSlash.nif": {
-    "sha256": "384e77d0c4b0f288c47509993473d54e4105420474e6043eca1606bf2c111b73",
+    "sha256": "226941fefc6df4f66f16c78e7efb99117d019c656f0254e34c32e1c58517d09c",
     "origin": "AP05 particle template plus Epsilona11 procedural geometry/material/animation changes; attribution/free-distribution conditions retained",
     "optimization": "Unreachable blocks removed; six secondary emission curves/capacities halved; original core, motion, fade and HDR materials retained",
     "introduced_by": "assistant during subsequent maintenance",
-    "original_author_release": "Not attributed to the author's original Redsand release; later additions are the assistant's responsibility to audit"
+    "original_author_release": "Not attributed to the author's original Redsand release; later additions are the assistant's responsibility to audit",
+    "layer_change": "Removed slash emitter branches; retained pointed cut and fade"
   },
   "Textures/RedsandParticles/Battleaxe.dds": {
     "sha256": "f305587d45f7e8413ecc9e7e1012eed49fd14ec88fdc81349a09973d5e4f96d6",
@@ -204,16 +202,8 @@
     "baseline_sha256": "f889a1f797610546705de23fbac3ed359340ca3d78bd5a0112c8028f437b3f87",
     "present_in_author_baseline": true
   },
-  "Textures/StellarImpact/ArtRework/ContactCorona.dds": {
-    "sha256": "f115ae399a0472c6759d954276d76c2a490cfad5f670ae7377d4237e6172812d",
-    "origin": "CC0 Effekseer tktk collection / Raffaele Picca; precise source in SelectedAssets.json, pixels verified"
-  },
   "Textures/StellarImpact/ArtRework/ContactLine.dds": {
     "sha256": "b90e639f89eded19a04026a715fb39584a2fadcd97541b08f5d3fb0b71b44554",
-    "origin": "CC0 Effekseer tktk collection / Raffaele Picca; precise source in SelectedAssets.json, pixels verified"
-  },
-  "Textures/StellarImpact/ArtRework/CoronaRays.dds": {
-    "sha256": "b4625f76f737e45a2c07c64f49de98233da8c2269997e5b4ecb666360135f9fe",
     "origin": "CC0 Effekseer tktk collection / Raffaele Picca; precise source in SelectedAssets.json, pixels verified"
   },
   "Textures/StellarImpact/ArtRework/Ember.dds": {
@@ -290,12 +280,13 @@
     "origin": "Original stationary emissive core-only 3D paths / white alpha travel profile; tools/build_block_lightning.py; project license; no outer halo mesh or borrowed art"
   },
   "Meshes/StellarImpact/Block/StarRing.nif": {
-    "sha256": "abfdf721c1a1eb5faefd0ddb23bfb61c880e7c3f9e0ae7564ddddf81ba5c2b40",
+    "sha256": "89088c4acc50eccd5429d1f389e8fa74dd7b1fd800e7ba8d71bb8b10507b1b6f",
     "origin": "ScholarKeriak credited resource-use permission; free distribution",
     "introduced_by": "assistant during subsequent maintenance",
     "original_author_release": "Not attributed to the author's original Redsand release; later additions are the assistant's responsibility to audit",
     "relocated_from": "Meshes/ValhallaCombat/SparksFlareRings.nif",
-    "runtime_dependency": "None; Redsand-native block style using private model and texture paths"
+    "runtime_dependency": "None; Redsand-native block style using private model and texture paths",
+    "layer_change": "Removed round geometry and dependent controllers; retained sparks"
   },
   "Textures/StellarImpact/StarRing.dds": {
     "sha256": "2fefff48af8c2033458b509025d025b6d5f51101996c289f4d560737cba30aea",
@@ -309,10 +300,19 @@
     "sha256": "978f49baa0d8f66dd902f2ba8cb3c50b590441636a70d4631a182c0568d3f739",
     "origin": "Private runtime particle container derived from the author-provided Redsand 1.0.0 baseline Default.nif; unchanged geometry and skeleton; private mathematical point texture and bounded 4096-vertex capacity; tools/generate_swing_trail_assets.py",
     "template": "Meshes/RedsandParticles/Default.nif",
-    "runtime": "Own CPU-simulated shrinking arc and short-lived residual grains; no copied video textures"
+    "runtime": "CPU-simulated short-lived scatter particles; no copied video textures"
+  },
+  "Meshes/RedsandSwingTrail/Ribbon.nif": {
+    "sha256": "dd765119520ed7e6efa7eacc0a5f1ef97f0a4ceb971806b1574fefd8f8725f90",
+    "origin": "Original indexed ribbon generated by tools/generate_swing_trail_assets.py with independent per-instance shapes and a private analytic opacity profile",
+    "runtime": "Transverse texture coordinates, vertex tint, and width taper define the connected weapon arc"
   },
   "Textures/RedsandSwingTrail/Point.dds": {
     "sha256": "90d720f7580ed1ba645bf6e0d3c6b1175977433137c1edc1fb21cb038050ea62",
     "origin": "Original analytic radial smooth-core white point mask generated by tools/generate_swing_trail_assets.py; full mip chain; project license; no reference image pixels used"
+  },
+  "Textures/RedsandSwingTrail/RibbonProfile.dds": {
+    "sha256": "d7d63210fee586fd32d120707536d4fcac687749f75a7c64efb46215ea101ff4",
+    "origin": "Original analytic bright core and symmetric halo opacity profile generated by tools/generate_swing_trail_assets.py; full mip chain; project license"
   }
 }

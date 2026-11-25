@@ -19,11 +19,6 @@ namespace RedsandImpactVFX
 	inline constexpr std::array<std::string_view, static_cast<unsigned>(NativeLayer::Count)> nativeLayerNames{
 		"Hit", "Stone", "Slash", "Block"
 	};
-	inline constexpr std::array<std::string_view, static_cast<unsigned>(RedsandSettings::BlockStyle::Count)> blockStyleModelNames{
-		"NormalBlock.nif", "TimedSparks.nif", "TimedFlare.nif", "PerfectRing.nif", "SimpleTimed.nif", "StarRing.nif"
-	};
-	using BlockStyleModels = std::array<std::string, blockStyleModelNames.size()>;
-	using BlockStyleAvailability = std::array<bool, blockStyleModelNames.size()>;
 	struct NativeRoute
 	{
 		NativeLayer layer = NativeLayer::Hit;
@@ -91,27 +86,6 @@ namespace RedsandImpactVFX
 		return static_cast<unsigned>(route.layer) < nativeLayerNames.size() && ValidModelPath(route.model) &&
 			std::isfinite(route.duration) && route.duration > 0.f && route.duration <= 30.f;
 	}
-	inline BlockStyleModels BlockStyleModelPaths(const NativeRoute& route)
-	{
-		BlockStyleModels models;
-		if (route.layer != NativeLayer::Block || !ValidNativeRoute(route)) { return models; }
-		const auto separator = route.model.find_last_of("/\\");
-		const auto directory = separator == std::string::npos ? std::string{} : route.model.substr(0, separator + 1);
-		for (std::size_t index = 0; index < models.size(); ++index) { models[index] = directory + std::string(blockStyleModelNames[index]); }
-		models[0] = route.model;
-		models[static_cast<unsigned>(RedsandSettings::BlockStyle::StarRing)] = "StellarImpact/Block/StarRing.nif";
-		return models;
-	}
-	inline unsigned BlockStyleIndex(RedsandSettings::BlockStyle style, const BlockStyleAvailability& available)
-	{
-		const auto index = static_cast<unsigned>(style);
-		return index < available.size() && available[index] ? index : 0;
-	}
-	inline float BlockStyleDuration(float duration, unsigned selectedStyle)
-	{
-		return selectedStyle == static_cast<unsigned>(RedsandSettings::BlockStyle::StarRing) ? std::max(duration, 2.f) : duration;
-	}
-
 	inline int ModelIndex(const RedsandSettings::Config&)
 	{
 		return 42;

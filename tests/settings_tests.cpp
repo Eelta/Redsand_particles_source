@@ -62,17 +62,17 @@ namespace
 		RedsandSettings::Load(path);
 		const auto defaults = RedsandSettings::Get();
 		Check(!defaults.swordReleasedTrail && defaults.swordRibbonLifetime == .2f && defaults.swordParticleLifetime == .3f &&
-			defaults.swordRibbonWidth == .5f && defaults.swordTrailMomentum == .1f && defaults.swordRibbonFadeOut == .25f &&
+			defaults.swordRibbonWidth == .15f && defaults.swordTrailMomentum == 1.f && defaults.swordRibbonFadeOut == .25f &&
 			defaults.swordParticleFadeOut == .4f && defaults.swordParticleGravity == .3f,
 			"Nexus Redsand preset differs from the approved defaults");
 		Check(defaults.swordTip && defaults.swordBrightness == 1.0f && defaults.swordDensity == 1.0f &&
 			defaults.swordSpread == 1.0f && defaults.swordSize == 1.0f,
 			"new melee defaults must enable sword-tip attachment and use unit multipliers");
-		Write(path, "[Menu]\nLanguage=Chinese\n[SwordParticles]\nTip=false\nBrightness=2\nDensity=0.5\nSpread=0.25\nSize=0.75\n");
+		Write(path, "[Menu]\nLanguage=Chinese\n[SwordParticles]\nTip=false\nBrightness=2\nDensity=0.5\nSpread=0.25\nSize=0.75\nRibbonWidth=0.15\n");
 		RedsandSettings::Load(path);
 		const auto saved = RedsandSettings::Get();
 		Check(!saved.swordTip && saved.swordBrightness == 2.0f && saved.swordDensity == 0.5f &&
-			saved.swordSpread == 0.25f && saved.swordSize == 0.75f,
+			saved.swordSpread == 0.25f && saved.swordSize == 0.75f && saved.swordRibbonWidth == .15f,
 			"new melee defaults replaced explicitly saved values");
 		RedsandSettings::ResetDefaults();
 		RedsandSettings::Load(path);
@@ -84,12 +84,13 @@ namespace
 	void OldIniPreservesSavedOptionsAndIgnoresRemovedStaffSection(const Workspace& workspace)
 	{
 		const auto path = workspace.path / "old-menu.ini";
-		Write(path, "[SwordParticles]\nTip=false\nBrightness=2\n[BowParticles]\nTrails=false\nDensity=0.5\n"
+		Write(path, "[SwordParticles]\nTip=false\nBrightness=2\nRibbonSmoothing=false\n[BowParticles]\nTrails=false\nDensity=0.5\n"
 			"[StaffParticles]\nEnabled=false\nPlayer=false\nNPC=false\nBrightness=4\nDensity=0\nGathering=false\nRings=false\nTrails=false\n");
 		RedsandSettings::Load(path);
 		auto expected = RedsandSettings::Config{};
 		expected.swordTip = false;
 		expected.swordBrightness = 2.0f;
+		expected.redsand.arcBrightness = expected.redsand.particleBrightness = 2.f;
 		expected.bowTrails = false;
 		expected.bowDensity = 0.5f;
 		Check(RedsandSettings::Get() == expected, "old INI controls, English default or new melee defaults were not preserved");
@@ -101,6 +102,22 @@ namespace
 		RedsandSettings::FlushPendingSave();
 		RedsandSettings::Load(path);
 		Check(RedsandSettings::Get()==expected,"global fade/gravity settings or zero-gravity choice did not survive reload");
+		expected.swordRibbonLifetime = .7f;
+		expected.swordRibbonFadeOut = .9f;
+		expected.swordParticleLifetime = .05f;
+		expected.swordParticleFadeOut = .08f;
+		RedsandSettings::Set(expected);
+		RedsandSettings::FlushPendingSave();
+		RedsandSettings::Load(path);
+		Check(RedsandSettings::Get() == expected, "a long arc forced short scatter times to grow during normalization or persistence");
+		const auto categoryPath = workspace.path / "independent-category-timing.ini";
+		Write(categoryPath, "[Enchantment.none]\nEnabled=true\nRibbonLifetime=0.7\nRibbonFadeOut=0.9\nParticleLifetime=0.05\nParticleFadeOut=0.08\n");
+		RedsandSettings::Load(categoryPath);
+		auto category = RedsandSettings::Get();
+		RedsandSettings::ApplyMeleeAppearance(category, "none", "");
+		Check(category.swordRibbonLifetime == .7f && category.swordRibbonFadeOut == .9f &&
+			category.swordParticleLifetime == .05f && category.swordParticleFadeOut == .08f,
+			"category-specific scatter times were coupled to the arc");
 		Check(Read(path).find("StaffParticles") == std::string::npos, "removed staff section was written back");
 	}
 
@@ -434,41 +451,75 @@ void RandomSlashPersistsAndDefaultsOff(const Workspace& workspace)
     Check(Get().slashRandomRange == .5f, "invalid numeric range did not restore 50%");
 }
 
-void BlockStylesPersistAndDefaultToNormal(const Workspace& workspace)
+void OldBlockStylesDoNotOverrideSparks(const Workspace& workspace)
 {
 	using namespace RedsandSettings;
 	const auto path = workspace.path / "block-style.ini";
-	Write(path, "[ImpactVFX]\nBrightness=1.75\nDensity=0.6\n");
+	Write(path, "[ImpactVFX]\nBlock=false\nBrightness=1.75\nDensity=0.6\n");
 	Load(path);
-	Check(Get().blockStyle == BlockStyle::NormalBlock, "existing settings did not retain normal block visuals");
-	for (unsigned index = 0; index < static_cast<unsigned>(BlockStyle::Count); ++index) {
-		Write(path, "[ImpactVFX]\nBrightness=1.75\nDensity=0.6\nBlockStyle=" + std::to_string(index) + "\n");
+	const auto baseline = Get();
+	for (const auto* style : {"1", "2", "3", "4", "5", "-1", "invalid"}) {
+		Write(path, "[ImpactVFX]\nBlock=false\nBrightness=1.75\nDensity=0.6\nBlockStyle=" + std::string(style) + "\n");
 		Load(path);
+		Check(Get() == baseline, "a legacy block style changed the sparks settings");
 		auto config = Get();
-		Check(static_cast<unsigned>(config.blockStyle) == index && config.impactBrightness == 1.75f && config.impactDensity == .6f,
-			"block style changed glow or particle settings");
 		config.diagnostics = true;
-		Set(config); FlushPendingSave(); Load(path);
-		Check(Get() == config && Read(path).find("BlockStyle=" + std::to_string(index)) != std::string::npos,
-			"block style did not round trip through INI storage");
-	}
-	for (const auto* value : { "", "-1", "6", "1.5", "junk", "4294967296" }) {
-		Write(path, "[ImpactVFX]\nBlockStyle=" + std::string(value) + "\nBrightness=1.75\n");
+		Set(config);
+		FlushPendingSave();
 		Load(path);
-		Check(Get().blockStyle == BlockStyle::NormalBlock && Get().impactBrightness == 1.75f,
-			"invalid block style was accepted or damaged unrelated settings");
+		Check(Get() == config && Read(path).find("BlockStyle=") == std::string::npos,
+			"the retired block selector was written back or changed the sparks settings");
 	}
-	auto invalid = Get(); invalid.blockStyle = static_cast<BlockStyle>(-1); Set(invalid);
-	Check(Get().blockStyle == BlockStyle::NormalBlock, "invalid runtime block style escaped normalization");
-	auto selected = Get(); selected.blockStyle = BlockStyle::PerfectRing; Set(selected); ResetDefaults();
-	Check(Get().blockStyle == BlockStyle::NormalBlock, "defaults retained an alternate block style");
 }
 
 int main()
 {
 	try {
 		const Workspace workspace;
-		BlockStylesPersistAndDefaultToNormal(workspace);
+		const auto migration = workspace.path / "redsand-migration.ini";
+		Write(migration, "[SwordParticles]\nEnabled=false\nReleasedTrail=true\nBrightness=2\nDensity=0.25\nSize=1.5\nSpread=3\nNPC=false\n"
+			"ParticleLifetime=0.2\nParticleFadeOut=0.25\n[Enchantment.fire]\nEnabled=true\nReleasedTrail=true\n"
+			"Brightness=4\nDensity=0.5\nSize=2\nSpread=2\n");
+		RedsandSettings::Load(migration);
+		auto migrated = RedsandSettings::Get();
+		Check(migrated.redsand.arcBrightness == 2.f && migrated.redsand.particleBrightness == 2.f &&
+			std::abs(migrated.redsand.density - .25f / 1.7f) < .00001f && migrated.redsand.size == 1.5f &&
+			!migrated.redsand.npc && migrated.redsand.player && !migrated.swordEnabled, "legacy Redsand appearance did not migrate");
+		auto category = migrated;
+		RedsandSettings::ApplyMeleeAppearance(category, "fire", "");
+		Check(category.redsand.arcBrightness == 4.f && std::abs(category.redsand.density - .5f / 1.35f) < .00001f &&
+			category.redsand.size == 2.f, "legacy Redsand category did not migrate");
+		migrated.redsand.arcBrightness = 0.f;
+		migrated.redsand.particleBrightness = 3.f;
+		migrated.redsand.size = 4.f;
+		migrated.swordParticleWidth = 3.f;
+		RedsandSettings::SetSwingDuration(migrated, .9f);
+		RedsandSettings::Set(migrated);
+		RedsandSettings::FlushPendingSave();
+		RedsandSettings::Load(migration);
+		const auto restored = RedsandSettings::Get();
+		Check(restored.redsand == migrated.redsand && restored.swordSize == 1.5f && restored.swordBrightness == 2.f &&
+			restored.swordParticleWidth == 3.f && std::abs(RedsandSettings::SwingDuration(restored) - .9f) < .001f,
+			"Redsand settings did not stay independent after saving and loading");
+		Write(migration, "[SwordParticles]\nTrailMomentum=1.75\nDensity=4\nSpread=3\n[RedsandTrail]\nSpacing=10\nDensity=0.36\n"
+			"[Enchantment.fire]\nEnabled=true\nTrailMomentum=2.5\nRedsandDensity=10\nRedsandSpacing=0\n");
+		RedsandSettings::Load(migration);
+		migrated = RedsandSettings::Get();
+		Check(std::abs(migrated.redsand.density - .36f / 4.15f) < .00001f && migrated.swordDensity == 4.f &&
+			migrated.swordSpread == 3.f && migrated.swordTrailMomentum == 1.75f,
+			"consolidating legacy spacing changed the dot rate, ordinary particles or saved speed");
+		category = migrated;
+		RedsandSettings::ApplyMeleeAppearance(category, "fire", "");
+		Check(category.redsand.density == RedsandSettings::maxRedsandDotDensity && category.swordTrailMomentum == 2.f,
+			"the densest legacy preset or the new speed limit was lost");
+		migrated.diagnostics = true;
+		RedsandSettings::Set(migrated);
+		RedsandSettings::FlushPendingSave();
+		const auto stored = Read(migration);
+		RedsandSettings::Load(migration);
+		Check(RedsandSettings::Get() == migrated && stored.find("\nSpacing=") == std::string::npos &&
+			stored.find("\nRedsandSpacing=") == std::string::npos, "unified density did not round trip as a single setting");
+		OldBlockStylesDoNotOverrideSparks(workspace);
         RandomSlashPersistsAndDefaultsOff(workspace);
 		ExistingBowIniRemainsCompatible(workspace);
 		SwordDefaultsAndSavedOverridesRemainDistinct(workspace);

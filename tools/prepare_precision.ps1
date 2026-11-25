@@ -28,10 +28,10 @@ function Replace-One([string]$Content, [string]$Before, [string]$After) {
     $cpp = Text $cppPath
     $header = Text $headerPath
     if ($cpp.Contains('UpdateRedsandParticles')) { throw 'Unexpected pre-patched Precision checkout.' }
-    $header = Replace-One $header 'std::optional<TrailOverride> a_trailOverride = std::nullopt);' 'std::optional<TrailOverride> a_trailOverride = std::nullopt, bool a_redsandNativeOnly = false);'
-    $header = Replace-One $header "`tbool Update(float a_deltaTime);" "`t~AttackTrail();`n`tbool ShouldAddPrecisionTrail() const;`n`tbool IsRedsandSwingTrail() const { return redsandReleasedSelected; }`n`tstatic void WarmRedsandSwingModel();`n`tbool Update(float a_deltaTime);"
-    $cpp = Replace-One $cpp 'std::optional<TrailOverride> a_trailOverride /*= std::nullopt*/) :' 'std::optional<TrailOverride> a_trailOverride /*= std::nullopt*/, bool a_redsandNativeOnly /*= false*/) :'
-    $cpp = Replace-One $cpp "`tactorHandle(a_actorHandle)" "`tactorHandle(a_actorHandle), redsandNativeOnly(a_redsandNativeOnly)"
+    $header = Replace-One $header 'std::optional<TrailOverride> a_trailOverride = std::nullopt);' 'std::optional<TrailOverride> a_trailOverride = std::nullopt, Redsand::Weapons::TrailLayer a_layer = Redsand::Weapons::TrailLayer::Primary);'
+    $header = Replace-One $header "`tbool Update(float a_deltaTime);" "`t~AttackTrail();`n`tbool ShouldAddPrecisionTrail() const;`n`tbool ShouldAddOrdinaryParticles() const;`n`tbool IsRedsandSwingTrail() const { return redsandReleasedSelected; }`n`tstatic void WarmRedsandSwingModel();`n`tbool Update(float a_deltaTime);"
+    $cpp = Replace-One $cpp 'std::optional<TrailOverride> a_trailOverride /*= std::nullopt*/) :' 'std::optional<TrailOverride> a_trailOverride /*= std::nullopt*/, Redsand::Weapons::TrailLayer a_layer) :'
+    $cpp = Replace-One $cpp "`tactorHandle(a_actorHandle)" "`tactorHandle(a_actorHandle), redsandNativeOnly(a_layer == Redsand::Weapons::TrailLayer::Precision)"
     $anchor = "bool AttackTrail::Update(float a_deltaTime)`n{`n"
     $cpp = Replace-One $cpp $anchor ((Text (Join-Path $SourceRoot 'source/NativeTrailLifecycle.inc')) + $anchor + "`tif (redsandReleasedSelected) { return UpdateRedsandSwingTrail(a_deltaTime); }`n" + (Text (Join-Path $SourceRoot 'source/NativeTrailUpdate.inc')))
     $includes = "#include `"RE/N/NiParticleSystem.h`"`n#include `"RE/N/NiPSysModifier.h`"`n#include `"RE/N/NiParticlesData.h`"`n#include `"RE/N/NiPSysData.h`"`n#include `"RE/N/NiInterpController.h`"`n#include `"RE/N/NiFloatInterpolator.h`"`n#include `"RE/N/NiFloatData.h`"`n#include `"RE/N/NiSourceTexture.h`"`n#include <atomic>`n#include <limits>`n"
@@ -78,7 +78,7 @@ function Replace-One([string]$Content, [string]$Before, [string]$After) {
     $cpp = Replace-One $cpp 'if (weaponNode && weaponNode != collisionNode) {' 'if (weaponNode && weaponNode.get() != collisionNode.get()) {'
     $anchor = ([regex]::Match($cpp, '(?m)^		trailParticle = RE::NiPointer<RE::BSTempEffectParticle>.*;$')).Value
     if (!$anchor) { throw 'Upstream trail creation signature changed.' }
-    $creation = "`t`tif (redsandReleasedSelected) {`n`t`t`tredsandSwingStart = collisionParentNode->world;`n`t`t} else {`n`t$anchor`n`t`t}"
+    $creation = "`t`tif (a_layer == Redsand::Weapons::TrailLayer::OrdinaryParticles && (!redsandOrdinaryAllowed || !redsandParticleSelected)) { bActive = false; return; }`n`t`tif (redsandReleasedSelected) {`n`t`t`tredsandSwingStart = collisionParentNode->world;`n`t`t} else {`n`t$anchor`n`t`t}"
     $cpp = Replace-One $cpp $anchor ((Text (Join-Path $SourceRoot 'source/TrailEnchantment.inc')) +
         (Text (Join-Path $SourceRoot 'source/TrailDensity.inc')) + $creation)
     $anchor = "`t`tconstexpr RE::NiPoint3 forwardVector{ 1.f, 0.f, 0.f };"

@@ -2,10 +2,10 @@
 param([switch]$Apply)
 $ErrorActionPreference='Stop'
 $taskRoot=(Resolve-Path -LiteralPath $PSScriptRoot).ProviderPath.TrimEnd('\')
-foreach($taskRequired in @('Build.ps1','source\RedsandSettings.h','output\Redsand Particles.zip')) {
+foreach($taskRequired in @('Build.ps1','source\RedsandSettings.h','output\Redsand Particles.7z')) {
  if(-not (Test-Path -LiteralPath (Join-Path $taskRoot $taskRequired))){throw "Missing current workspace file: $taskRequired"}
 }
-$taskKeep=@('Redsand Particles.zip')
+$taskKeep=@('Redsand Particles.7z')
 $taskPreserved=@{}
 foreach($taskName in $taskKeep){$taskPath=Join-Path $taskRoot ('output\'+$taskName);if(Test-Path -LiteralPath $taskPath -PathType Leaf){$taskPreserved[$taskPath]=(Get-FileHash -LiteralPath $taskPath).Hash}}
 $taskTargets=@()

@@ -69,6 +69,22 @@ namespace Redsand::Weapons
 		}
 	}
 
+	[[nodiscard]] constexpr Profile ForType(std::uint32_t type, bool warhammerKeyword = false) noexcept
+	{
+		switch (type) {
+		case 1: return Profile::Sword;
+		case 2: return Profile::Dagger;
+		case 3: return Profile::WarAxe;
+		case 4: return Profile::Mace;
+		case 5: return Profile::Greatsword;
+		case 6: return warhammerKeyword ? Profile::Warhammer : Profile::Battleaxe;
+		case 7: return Profile::Bow;
+		case 8: return Profile::Default;
+		case 9: return Profile::Crossbow;
+		default: return Profile::Default;
+		}
+	}
+
 	[[nodiscard]] constexpr Profile Resolve(Descriptor weapon) noexcept
 	{
 		if (!detail::EqualASCII(weapon.originPlugin, "Skyrim.esm") &&
@@ -76,18 +92,7 @@ namespace Redsand::Weapons
 			!detail::EqualASCII(weapon.originPlugin, "Dragonborn.esm")) {
 			return Profile::Default;
 		}
-		switch (weapon.type) {
-		case 1: return Profile::Sword;
-		case 2: return Profile::Dagger;
-		case 3: return Profile::WarAxe;
-		case 4: return Profile::Mace;
-		case 5: return Profile::Greatsword;
-		case 6: return weapon.warhammerKeyword ? Profile::Warhammer : Profile::Battleaxe;
-		case 7: return Profile::Bow;
-		case 8: return Profile::Default;
-		case 9: return Profile::Crossbow;
-		default: return Profile::Default;
-		}
+		return ForType(weapon.type, weapon.warhammerKeyword);
 	}
 
 	[[nodiscard]] constexpr Profile Resolve(std::string_view originPlugin, std::uint32_t type, bool warhammerKeyword = false) noexcept

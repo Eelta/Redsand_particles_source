@@ -131,12 +131,14 @@ namespace RE
 		T* operator->() const { return value; }
 		explicit operator bool() const { return value != nullptr; }
 	};
-	enum class WEAPON_TYPE { kOneHandSword = 1, kStaff = 8 };
+	enum class WEAPON_TYPE { kOneHandSword = 1, kTwoHandAxe = 6, kStaff = 8 };
 	class TESObjectWEAP
 	{
 	public:
 		WEAPON_TYPE type = WEAPON_TYPE::kOneHandSword;
+		bool warhammer = false;
 		WEAPON_TYPE GetWeaponType() const { return type; }
+		bool HasKeywordString(std::string_view name) const { return warhammer && name == "WeapTypeWarhammer"; }
 		std::uint32_t GetFormID() const { return 0x123; }
 		template <class T> T* As() { return static_cast<T*>(this); }
 	};
@@ -491,9 +493,11 @@ namespace
 		Profile redsandWeaponProfile = Profile::Default;
 		bool redsandLegacyTrail = false, redsandActorIsPlayer = false, redsandScopeAllowed = false;
 		bool redsandNativeOnly = false, redsandParticleSelected = false, redsandReleasedSelected = false;
+		bool redsandOrdinaryAllowed = false;
 		std::optional<RE::NiColorA> baseColorOverride;
 		std::string Select(const RedsandSettings::Config& config, RE::Actor* actor, RE::TESObjectWEAP* weapon,
-			std::string_view requested, std::string_view installedRibbon)
+			std::string_view requested, std::string_view installedRibbon,
+			Redsand::Weapons::TrailLayer a_layer = Redsand::Weapons::TrailLayer::Primary)
 		{
 			using namespace std::literals;
 			RedsandSettings::scopeConfig = config;
@@ -539,7 +543,9 @@ namespace
 						config.swordEnabled = enabled;
 						config.swordPlayer = players;
 						config.swordNPC = npcs;
-						const bool allowed = enabled && (player ? players : npcs);
+						config.redsand.player = players;
+						config.redsand.npc = npcs;
+						const bool allowed = (released || enabled) && (player ? players : npcs);
 						for (const auto requested : ownMeshes) {
 							ScopeFixture fixture;
 							const auto selected = fixture.Select(config, &actor, &weapon, requested, customRibbon);
@@ -573,6 +579,25 @@ namespace
 		}
 		ScopeFixture missingActor;
 		RE::Actor nativeActor;
+		nativeActor.player = true;
+		RedsandSettings::Config independent;
+		independent.swordReleasedTrail = independent.swordEnabled = independent.swordPlayer = independent.redsand.player = true;
+		ScopeFixture arc, ordinary;
+		using Redsand::Weapons::TrailLayer;
+		Check(arc.Select(independent, &nativeActor, &weapon, own, customRibbon) == "RedsandSwingTrail/Arc.nif" && arc.redsandOrdinaryAllowed,
+			"Redsand did not select its fixed round-dot resource alongside ordinary particles");
+		const auto weaponParticles = ordinary.Select(independent, &nativeActor, &weapon, customRibbon, customRibbon, TrailLayer::OrdinaryParticles);
+		const auto ordinaryWeaponMesh = Redsand::Weapons::MapMeshPath(own, Profile::Sword);
+		Check(weaponParticles == ordinaryWeaponMesh && weaponParticles != arc.Select(independent, &nativeActor, &weapon, own, customRibbon) &&
+			ordinary.redsandParticleSelected && !ordinary.redsandReleasedSelected,
+			"ordinary companion did not keep its weapon-specific mesh");
+		independent.redsand.player = false;
+		Check(IsParticleMesh(ordinary.Select(independent, &nativeActor, &weapon, own, customRibbon)) && !ordinary.redsandReleasedSelected,
+			"Redsand actor scope disabled independently enabled ordinary particles");
+		independent.redsand.player = true;
+		independent.swordPlayer = false;
+		Check(arc.Select(independent, &nativeActor, &weapon, own, customRibbon) == "RedsandSwingTrail/Arc.nif" && !arc.redsandOrdinaryAllowed,
+			"ordinary actor scope disabled independently enabled Redsand dots");
 		ScopeFixture native;
 		native.redsandNativeOnly = true;
 		for (const auto mesh : ownMeshes) {

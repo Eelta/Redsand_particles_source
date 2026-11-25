@@ -250,31 +250,6 @@ void FormFreeNativePlaybackPolicies()
 	RedsandSettings::Config config;
 	NativeRoute block{ NativeLayer::Block, "StellarImpact/Runtime/B2D2S2/Block/NormalBlock.nif", .85f };
 	Check(ValidNativeRoute(block), "valid form-free block route rejected");
-	const auto models = BlockStyleModelPaths(block);
-	const BlockStyleModels expected{
-		"StellarImpact/Runtime/B2D2S2/Block/NormalBlock.nif", "StellarImpact/Runtime/B2D2S2/Block/TimedSparks.nif",
-		"StellarImpact/Runtime/B2D2S2/Block/TimedFlare.nif", "StellarImpact/Runtime/B2D2S2/Block/PerfectRing.nif",
-		"StellarImpact/Runtime/B2D2S2/Block/SimpleTimed.nif", "StellarImpact/Block/StarRing.nif"
-	};
-	Check(models == expected, "block style choices lost their installed native models");
-	BlockStyleAvailability available{ true, true, true, true, true, true };
-	for (unsigned index = 0; index < models.size(); ++index) {
-		const auto style = static_cast<RedsandSettings::BlockStyle>(index);
-		Check(BlockStyleIndex(style, available) == index, "available native block style was unreachable");
-		Check(BlockStyleDuration(block.duration, BlockStyleIndex(style, available)) ==
-			(style == RedsandSettings::BlockStyle::StarRing ? 2.f : block.duration), "block style lifespan clipped the ring or changed existing sparks");
-		available[index] = false;
-		Check(BlockStyleIndex(style, available) == 0, "missing block style did not fall back to normal sparks");
-		Check(BlockStyleDuration(block.duration, BlockStyleIndex(style, available)) == block.duration,
-			"missing ring fallback retained the longer ring lifespan");
-		available[index] = true;
-	}
-	Check(BlockStyleIndex(RedsandSettings::BlockStyle::Count, available) == 0 &&
-		BlockStyleIndex(static_cast<RedsandSettings::BlockStyle>(-1), available) == 0, "invalid block style escaped default fallback");
-	Check(BlockStyleDuration(3.f, static_cast<unsigned>(RedsandSettings::BlockStyle::StarRing)) == 3.f,
-		"ring lifespan shortened an explicitly longer native duration");
-	auto unrelated = block; unrelated.layer = NativeLayer::Hit;
-	Check(BlockStyleModelPaths(unrelated) == BlockStyleModels{}, "block style model selection leaked into hit effects");
 	Check(SelectNativeBlock(true, true, false, config) && !SelectNativeBlock(true, true, true, config) &&
 		!SelectNativeBlock(true, false, false, config), "ordinary blocks and bashes were conflated");
 	Check(SelectNativeWorld(false, true, false, config) && !SelectNativeWorld(true, true, false, config) &&

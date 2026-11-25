@@ -36,6 +36,9 @@ namespace
 
 	void OriginMatchingCannotAdoptModWeapons()
 	{
+		Check(ForType(1) == Profile::Sword && ForType(2) == Profile::Dagger &&
+			ForType(5) == Profile::Greatsword && ForType(6, true) == Profile::Warhammer,
+			"weapon type classification changed");
 		Check(Resolve("sKyRiM.EsM", 1) == Profile::Sword, "plugin filename matching should ignore ASCII case");
 		Check(Resolve("DAWNGUARD.ESM", 9) == Profile::Crossbow, "mixed-case DLC filename was not accepted");
 		Check(Resolve("dragonborn.esm", 9) == Profile::Crossbow, "lowercase DLC filename was not accepted");

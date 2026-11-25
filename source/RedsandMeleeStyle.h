@@ -70,9 +70,16 @@ namespace Redsand::Weapons
 		return !poison && hasEnchantment && ((knownPercent && percent <= 0.) ||
 			(costAvailable && cost > 0.f && chargeValue < cost));
 	}
-	constexpr bool MeleeScopeAllowed(const RedsandSettings::Config& config, bool player, bool staff)
+	enum class TrailLayer { Primary, Precision, OrdinaryParticles };
+
+	constexpr bool OrdinaryMeleeParticlesAllowed(const RedsandSettings::Config& config, bool player, bool staff)
 	{
 		return !staff && config.swordEnabled && (player ? config.swordPlayer : config.swordNPC);
+	}
+
+	constexpr bool RedsandArcAllowed(const RedsandSettings::Config& config, bool player, bool staff)
+	{
+		return !staff && config.swordReleasedTrail && (player ? config.redsand.player : config.redsand.npc);
 	}
 
 	constexpr bool IsParticleMesh(std::string_view path)

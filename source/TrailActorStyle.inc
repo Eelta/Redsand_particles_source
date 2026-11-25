@@ -7,6 +7,9 @@ redsandConfig = RedsandSettings::Get();
 		redsandEnchantmentFallback.clear();
 		RedsandSettings::ApplyMeleeAppearance(redsandConfig, redsandEnchantmentKey, "");
 		redsandActorIsPlayer = redsandActor && redsandActor->IsPlayerRef();
-		redsandScopeAllowed = !redsandNativeOnly && redsandActor && Redsand::Weapons::MeleeScopeAllowed(redsandConfig, redsandActorIsPlayer, redsandStaff);
+		const bool allowRedsandLayers = !redsandNativeOnly && redsandActor;
+		redsandOrdinaryAllowed = allowRedsandLayers && Redsand::Weapons::OrdinaryMeleeParticlesAllowed(redsandConfig, redsandActorIsPlayer, redsandStaff);
+		redsandReleasedSelected = allowRedsandLayers && a_layer == Redsand::Weapons::TrailLayer::Primary &&
+			Redsand::Weapons::RedsandArcAllowed(redsandConfig, redsandActorIsPlayer, redsandStaff);
+		redsandScopeAllowed = redsandOrdinaryAllowed || redsandReleasedSelected;
 		redsandLegacyTrail = !redsandScopeAllowed;
-		redsandReleasedSelected = redsandScopeAllowed && redsandConfig.swordReleasedTrail;

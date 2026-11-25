@@ -180,10 +180,10 @@ try {
     $cpp = Text $cppPath
     $header = Text $headerPath
     if ($cpp.Contains('UpdateRedsandParticles')) { throw 'Unexpected pre-patched Precision checkout.' }
-    $header = Replace-One $header 'std::optional<TrailOverride> a_trailOverride = std::nullopt);' 'std::optional<TrailOverride> a_trailOverride = std::nullopt, bool a_redsandNativeOnly = false);'
-    $header = Replace-One $header "`tbool Update(float a_deltaTime);" "`t~AttackTrail();`n`tbool ShouldAddPrecisionTrail() const;`n`tbool IsRedsandSwingTrail() const { return redsandReleasedSelected; }`n`tstatic void WarmRedsandSwingModel();`n`tbool Update(float a_deltaTime);"
-    $cpp = Replace-One $cpp 'std::optional<TrailOverride> a_trailOverride /*= std::nullopt*/) :' 'std::optional<TrailOverride> a_trailOverride /*= std::nullopt*/, bool a_redsandNativeOnly /*= false*/) :'
-    $cpp = Replace-One $cpp "`tactorHandle(a_actorHandle)" "`tactorHandle(a_actorHandle), redsandNativeOnly(a_redsandNativeOnly)"
+    $header = Replace-One $header 'std::optional<TrailOverride> a_trailOverride = std::nullopt);' 'std::optional<TrailOverride> a_trailOverride = std::nullopt, Redsand::Weapons::TrailLayer a_layer = Redsand::Weapons::TrailLayer::Primary);'
+    $header = Replace-One $header "`tbool Update(float a_deltaTime);" "`t~AttackTrail();`n`tbool ShouldAddPrecisionTrail() const;`n`tbool ShouldAddOrdinaryParticles() const;`n`tbool IsRedsandSwingTrail() const { return redsandReleasedSelected; }`n`tstatic void WarmRedsandSwingModel();`n`tbool Update(float a_deltaTime);"
+    $cpp = Replace-One $cpp 'std::optional<TrailOverride> a_trailOverride /*= std::nullopt*/) :' 'std::optional<TrailOverride> a_trailOverride /*= std::nullopt*/, Redsand::Weapons::TrailLayer a_layer) :'
+    $cpp = Replace-One $cpp "`tactorHandle(a_actorHandle)" "`tactorHandle(a_actorHandle), redsandNativeOnly(a_layer == Redsand::Weapons::TrailLayer::Precision)"
     $anchor = "bool AttackTrail::Update(float a_deltaTime)`n{`n"
     $cpp = Replace-One $cpp $anchor ((Text (Join-Path $PSScriptRoot 'source/NativeTrailLifecycle.inc')) + $anchor + "`tif (redsandReleasedSelected) { return UpdateRedsandSwingTrail(a_deltaTime); }`n" + (Text (Join-Path $PSScriptRoot 'source/NativeTrailUpdate.inc')))
     $includes = "#include `"RE/N/NiParticleSystem.h`"`n#include `"RE/N/NiPSysModifier.h`"`n#include `"RE/N/NiParticlesData.h`"`n#include `"RE/N/NiPSysData.h`"`n#include `"RE/N/NiInterpController.h`"`n#include `"RE/N/NiFloatInterpolator.h`"`n#include `"RE/N/NiFloatData.h`"`n#include `"RE/N/NiSourceTexture.h`"`n#include <atomic>`n#include <limits>`n"
@@ -230,7 +230,7 @@ try {
     $cpp = Replace-One $cpp 'if (weaponNode && weaponNode != collisionNode) {' 'if (weaponNode && weaponNode.get() != collisionNode.get()) {'
     $anchor = ([regex]::Match($cpp, '(?m)^		trailParticle = RE::NiPointer<RE::BSTempEffectParticle>.*;$')).Value
     if (!$anchor) { throw 'Upstream trail creation signature changed.' }
-    $creation = "`t`tif (redsandReleasedSelected) {`n`t`t`tredsandSwingStart = collisionParentNode->world;`n`t`t} else {`n`t$anchor`n`t`t}"
+    $creation = "`t`tif (a_layer == Redsand::Weapons::TrailLayer::OrdinaryParticles && (!redsandOrdinaryAllowed || !redsandParticleSelected)) { bActive = false; return; }`n`t`tif (redsandReleasedSelected) {`n`t`t`tredsandSwingStart = collisionParentNode->world;`n`t`t} else {`n`t$anchor`n`t`t}"
     $cpp = Replace-One $cpp $anchor ((Text (Join-Path $PSScriptRoot 'source/TrailEnchantment.inc')) +
         (Text (Join-Path $PSScriptRoot 'source/TrailDensity.inc')) + $creation)
     $anchor = "`t`tconstexpr RE::NiPoint3 forwardVector{ 1.f, 0.f, 0.f };"
@@ -465,7 +465,7 @@ try {
         buildUtc=[DateTime]::UtcNow.ToString('o')
         particleMaterialIsolationFix=1
         particleDiagnostics=1
-        diagnosticLoggingDefault=$false
+        diagnosticLoggingDefault=$true
         independentDiagnosticLog='RedsandParticles.log'
         diagnosticLogMode='OverwritePerGameSession'
         diagnosticLogMaxBytes=8388608
@@ -482,7 +482,7 @@ try {
         optionalPrecisionRibbonAlongsideParticles=$true
         keepPrecisionTrailDefault=$true
         impactVFXControls=7
-        blockLightning=@{ playerOnly=$true; additive=$true; altersTime=$false; screenSpace=$false; maxInstances=3; branchesPerInstance=60; stationaryCoreMeshes=60; geometryOscillation=$false; translucentShells=0; customDefaultColor=$true; lifetime=1.55; travellingHeadTail=$true; defaultEnabled=$false; defaultChance=0.10 }
+        blockLightning=@{ playerOnly=$true; additive=$true; altersTime=$false; screenSpace=$false; maxInstances=3; branchesPerInstance=60; stationaryCoreMeshes=60; geometryOscillation=$false; translucentShells=0; customDefaultColor=$true; lifetime=1.55; travellingHeadTail=$true; defaultEnabled=$true; defaultChance=1.0 }
         impactVFXContinuous=$true
         approvedAppearanceUnitBaseline=@{ brightness=10.0; density=10.0; cutLength=10.0 }
         impactDensityDefault=0.1
@@ -492,7 +492,7 @@ try {
         enchantmentCategoryKeys=@('none','fire','frost','shock','green','purple','blue','red','bound','sun','unknown')
         enchantmentCategoriesIndependentOfMain=$true
         enchantmentCategoriesUseOriginalPriority=$true
-        redsandMode=@{ defaultEnabled=$false; replacesPrecisionRibbon=$true; perCategory=$true; arcFade='smooth-opacity-with-light-width-taper'; ribbonLifetime=0.2; particleLifetime=0.3; ribbonWidth=0.5; trailMomentum=0.1; lifetimeKeysRepresentHoldTime=$true; ribbonFadeOut=0.25; particleFadeOut=0.4; particleGravityDefault=0.3; gravityAcceleration=240.0; particleDrag=3.0; lifetimeAfterSwing=$false; emissionWindow="weapon-collision"; runtimeRibbonHoldCap=0.105; runtimeRibbonFadeCap=0.215; runtimeParticleHoldCap=0.11; runtimeParticleFadeCap=0.28; curve='causal-angular-tangent-hermite'; zeroFrameLookahead=$true; smallConcentratedGrains=$true; maximumInstances=32; maximumParticlesPerInstance=4096; damageProjectile=$false }
+        redsandMode=@{ defaultEnabled=$true; replacesPrecisionRibbon=$true; perCategory=$true; ordinaryParticlesIndependent=$true; arcFade='progressive-dim-core'; ribbonLifetime=0.102222; particleLifetime=0.204444; ribbonWidth=0.15; ribbonWidthMultiplierDefault=1.0; ribbonWidthMultiplierRange=@(0.0,2.0); trailMomentum=1.0; trailMomentumRange=@(0.0,2.0); lifetimeKeysRepresentHoldTime=$true; ribbonFadeOut=0.153333; particleFadeOut=0.255556; particleDrag=3.0; emissionWindow='weapon-collision'; curve='measured-tip-local-spline'; zeroFrameLookahead=$true; roundGrains=$true; unifiedGrainDensity=$true; tailFlutter=$true; maximumInstances=32; maximumParticlesPerInstance=4096; damageProjectile=$false }
         impactVFXBrightnessRange=@(0.0,20.0)
         impactVFXDensityRange=@(0.0,10.0)
         impactVFXSizeRange=@(0.05,10.0)
@@ -504,7 +504,7 @@ try {
         impactVFXPresetCount=64
         sharedImpactModels=$true
         omittedLegacyImpactMeshes=640
-        distinctBlockStyles=5
+        distinctBlockStyles=1
         redsandSharedCurveEvaluation=$true
         redsandSharedDampingCoefficients=$true
         impactVFXNativeMeasuredSlash=1
@@ -580,8 +580,31 @@ try {
     $installer = Join-Path $WorkRoot 'Redsand Particles.zip'
     Run 'python' @((Join-Path $PSScriptRoot 'tools/build_installer.py'), '--runtime', $archive, '--output', $installer, '--manifest', $manifestPath)
     Run 'python' @((Join-Path $PSScriptRoot 'tools/verify_installer.py'), '--archive', $installer, '--runtime', $archive, '--decoder', (Join-Path $testBuild 'Release/impact_vfx_tests.exe'), '--manifest', $manifestPath)
-    $release = Join-Path $output 'Redsand Particles.zip'
-    Copy-Item -LiteralPath $installer -Destination $release -Force
+    $installerFiles = Join-Path $WorkRoot ('installer-files-' + [guid]::NewGuid().ToString('N'))
+    [IO.Compression.ZipFile]::ExtractToDirectory($installer, $installerFiles)
+    $installer7z = Join-Path $WorkRoot ('installer-' + [guid]::NewGuid().ToString('N') + '.7z')
+    Push-Location -LiteralPath $installerFiles
+    try { Run '7z' @('a', '-t7z', '-mx=9', $installer7z, '*') }
+    finally { Pop-Location }
+    Run '7z' @('t', $installer7z)
+    $verifiedFiles = Join-Path $WorkRoot ('installer-verified-' + [guid]::NewGuid().ToString('N'))
+    Run '7z' @('x', $installer7z, "-o$verifiedFiles", '-y')
+    $expectedFiles = @(Get-ChildItem -LiteralPath $installerFiles -File -Recurse)
+    $actualFiles = @(Get-ChildItem -LiteralPath $verifiedFiles -File -Recurse)
+    if ($expectedFiles.Count -ne $actualFiles.Count) { throw 'Repacked installer file count differs' }
+    foreach ($file in $expectedFiles) {
+        $relative = $file.FullName.Substring($installerFiles.Length + 1)
+        $extracted = Join-Path $verifiedFiles $relative
+        if ((Get-FileHash -LiteralPath $file.FullName).Hash -ne (Get-FileHash -LiteralPath $extracted).Hash) {
+            throw "Repacked installer file differs: $relative"
+        }
+    }
+    $release = Join-Path $output 'Redsand Particles.7z'
+    Copy-Item -LiteralPath $installer7z -Destination $release -Force
+    $buildManifest = Get-Content -LiteralPath $manifestPath -Raw | ConvertFrom-Json -AsHashtable
+    $buildManifest['nexusInstallerSHA256'] = (Get-FileHash -LiteralPath $release).Hash
+    $buildManifest['nexusInstallerFileCount'] = $actualFiles.Count
+    Save $manifestPath ($buildManifest | ConvertTo-Json -Depth 12)
     Write-Host "Created Nexus installer: $release"
     if ($KeepWork) {
         Write-Host 'Build completed. Generated intermediates retained by -KeepWork.'

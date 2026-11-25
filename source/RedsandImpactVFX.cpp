@@ -41,8 +41,6 @@ namespace RedsandImpactVFX
 		RedsandSettings::Config lastConfig;
 		bool diagnosticsWereEnabled = false;
 		std::array<std::optional<NativeRoute>, static_cast<unsigned>(NativeLayer::Count)> nativeRoutes;
-		BlockStyleModels blockStyleModels;
-		BlockStyleAvailability blockStylesAvailable{};
 		std::size_t expectedVanillaRoutes = 0;
 		struct RandomSlashRequest
 		{
@@ -114,7 +112,8 @@ namespace RedsandImpactVFX
 			for (auto& live : routes) {
 				if (live.definition.kind != Kind::Impact || NormalizePath(live.definition.plugin) != "skyrim.esm" || live.ownership.conflicted) { continue; }
 				const auto* current = live.model->GetModel();
-				const auto decision = Plan(live.definition, live.ownership, current ? current : "", live.impact->data.effectDuration, config);
+				const auto decision = Plan(live.definition, live.ownership, current ? current : "", live.impact->data.effectDuration,
+					config);
 				if (decision.conflict) { RecordConflict(live, current ? current : ""); }
 				else if (!decision.write) { ++controlled; }
 			}
@@ -220,10 +219,7 @@ namespace RedsandImpactVFX
 		{
 			const auto* route = NativeRouteFor(selected);
 			if (!route || !cell || !Enabled(NativeCategory(selected), config)) { return nullptr; }
-			const auto blockStyle = selected == NativeLayer::Block ? BlockStyleIndex(config.blockStyle, blockStylesAvailable) : 0;
-			const auto& model = selected == NativeLayer::Block ?
-				blockStyleModels[blockStyle] : route->model;
-			const auto duration = selected == NativeLayer::Block ? BlockStyleDuration(route->duration, blockStyle) : route->duration;
+			const auto& model = route->model;
 			const auto probeKind = static_cast<unsigned>(selected);
 			const auto* layer = nativeLayerNames[probeKind].data();
 
@@ -233,7 +229,7 @@ namespace RedsandImpactVFX
 				(RedsandSlashRandom::attackSeed ? RedsandSlashRandom::attackSeed : RedsandSlashRandom::NextSeed()) : 0u;
 			const auto sceneSeed = slashContact && selected == NativeLayer::Hit ? -static_cast<std::int32_t>(seed) : static_cast<std::int32_t>(seed);
 			RedsandSlashRandom::AttackScope randomScope(seed ? seed : RedsandSlashRandom::attackSeed);
-			auto* effect = RE::BSTempEffectParticle::Spawn(cell, duration,
+			auto* effect = RE::BSTempEffectParticle::Spawn(cell, route->duration,
 				model.c_str(), basis, position, 1.f, 7, nullptr);
 			if (effect && seed && !AttachSlashSeed(effect->particleObject.get(), sceneSeed)) {
 				std::lock_guard lock(randomSlashLock);
@@ -423,18 +419,7 @@ namespace RedsandImpactVFX
 					nativeRoutes[static_cast<unsigned>(definition.layer)] = definition;
 					++next.resolved; ++next.nativeResolved;
 				}
-				if (const auto* block = NativeRouteFor(NativeLayer::Block)) {
-					blockStyleModels = BlockStyleModelPaths(*block);
-					for (std::size_t index = 0; index < blockStyleModels.size(); ++index) {
-						blockStylesAvailable[index] = AvailableModel(blockStyleModels[index]);
-						if (!blockStylesAvailable[index]) {
-							++next.resourceFailures;
-							next.detail = "Block style missing asset: Meshes\\" + blockStyleModels[index];
-							logger::warn("Redsand Impact VFX block style skipped: {}", next.detail);
-						}
-					}
-					next.blockAvailable = blockStylesAvailable[0];
-				}
+				next.blockAvailable = NativeRouteFor(NativeLayer::Block) != nullptr;
 				auto* handler = RE::TESDataHandler::GetSingleton();
 				Manifest::Require(handler != nullptr, "TESDataHandler unavailable");
 				ModelAvailability checkedModels;
@@ -499,8 +484,6 @@ namespace RedsandImpactVFX
 
 			routes.clear();
 			for (auto& route : nativeRoutes) { route.reset(); }
-			blockStyleModels = {};
-			blockStylesAvailable = {};
 			next.blockAvailable = false;
 			next.resolved = 0;
 			next.nativeResolved = 0;

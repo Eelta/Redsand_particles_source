@@ -20,7 +20,7 @@ int main() try
 	EnchantmentAppearance fire, unknown, none;
 	fire.enabled = unknown.enabled = none.enabled = true;
     fire.color.custom = true;
-    fire.swordReleasedTrail=true;fire.swordRibbonLifetime=.065f;fire.swordParticleLifetime=.13f;fire.swordRibbonWidth=.7f;fire.swordTrailMomentum=.2f;
+    fire.swordReleasedTrail=true;fire.swordRibbonLifetime=.065f;fire.swordParticleLifetime=.13f;fire.swordRibbonWidth=.21f;fire.swordTrailMomentum=.2f;
     fire.swordRibbonFadeOut=.31f;fire.swordParticleFadeOut=.45f;fire.swordParticleGravity=.65f;
     fire.swordEnabled = true; fire.swordPlayer = false; fire.swordNPC = true; fire.swordTip = false; fire.swordKeepPrecisionTrail = false;
     fire.bowEnabled = true; fire.bowPlayer = true; fire.bowNPC = false; fire.bowGathering = false; fire.bowRings = false; fire.bowTrails = true;

@@ -138,35 +138,17 @@ def main():
         assert set(default_payload) == set(runtime)
         defaults = configparser.ConfigParser()
         defaults.read_string(default_payload[ini_name].decode('utf-8-sig'))
-        for section, keys in {'SwordParticles': ('Brightness', 'Density', 'Spread', 'Size'),
-                              'BowParticles': ('Brightness', 'Density'),
-                              'ImpactVFX': ('Brightness', 'Size', 'HitBrightness', 'HitSize', 'CutBrightness', 'CutLength')}.items():
-            assert all(defaults.getfloat(section, key) == 1 for key in keys)
-        for key, value in {'Density': .1, 'HitDensity': .1, 'CutLength': 1, 'CutWidth': 1}.items():
-            assert defaults.getfloat('ImpactVFX', key) == value
+        shipped_preset = configparser.ConfigParser()
+        shipped_preset.read_string(runtime[ini_name].decode('utf-8-sig'))
+        assert {section: dict(defaults[section]) for section in defaults.sections()} == {
+            section: dict(shipped_preset[section]) for section in shipped_preset.sections()
+        }, 'The recommended install altered the shipped preset'
+        assert defaults['Menu']['Language'] == 'English'
+        assert defaults.getboolean('SwordParticles', 'ReleasedTrail')
         assert not defaults.getboolean('ImpactVFX', 'RandomSlashColor')
         assert not defaults.getboolean('ImpactVFX', 'RandomSlashValues')
-        assert not defaults.getboolean('SwordParticles', 'ReleasedTrail')
-        assert defaults.getfloat('SwordParticles', 'RibbonLifetime') == .2
-        assert defaults.getfloat('SwordParticles', 'ParticleLifetime') == .3
-        for section in ['SwordParticles'] + [n for n in defaults.sections() if n.startswith('Enchantment.')]:
-            assert not defaults.getboolean(section, 'ReleasedTrail')
-            assert defaults.getfloat(section, 'RibbonLifetime') == .2
-            assert defaults.getfloat(section, 'ParticleLifetime') == .3
-            assert defaults.getfloat(section, 'RibbonWidth') == .5
-            assert defaults.getfloat(section, 'TrailMomentum') == .1
-            assert defaults.getfloat(section, 'RibbonFadeOut') == .25
-            assert defaults.getfloat(section, 'ParticleFadeOut') == .4
-            assert defaults.getfloat(section, 'ParticleGravity') == .3
-
         for key in ('none', 'fire', 'frost', 'shock', 'green', 'purple', 'blue', 'red', 'bound', 'sun', 'unknown'):
             assert not defaults.getboolean('Enchantment.' + key, 'Enabled')
-            assert not defaults.getboolean('Enchantment.' + key, 'ReleasedTrail')
-            assert not defaults.getboolean('Enchantment.' + key, 'CustomColor')
-            assert not defaults.getboolean('Enchantment.' + key, 'BowCustomColor')
-            for value in ('Brightness', 'Density', 'Size', 'Spread', 'BowBrightness', 'BowDensity', 'BowSize'):
-                assert defaults.getfloat('Enchantment.' + key, value) == 1
-        assert len([s for s in defaults.sections() if s.startswith('Enchantment.')]) == 11
         if args.extract_default:
             destination = args.extract_default.resolve()
             assert not destination.exists(), 'Use a new extraction directory'

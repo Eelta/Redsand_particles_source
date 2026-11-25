@@ -62,7 +62,7 @@ int main()
 	config.hitDensity = 0.f;
 	config.hitBrightness = 2.f;
 	config.cutBrightness = .25f;
-	if (RateFactor(config, ColorTarget::Hit) != 0.f || std::abs(RateFactor(config, ColorTarget::Block) - 28.5f) > .0001f ||
+	if (RateFactor(config, ColorTarget::Hit) != 0.f || std::abs(RateFactor(config, ColorTarget::Block) - 17.1f) > .0001f ||
 		GlowStrength(8.f, false, config, ColorTarget::Hit) != 160.f ||
 		GlowStrength(8.f, false, config, ColorTarget::Cut) != 20.f ||
 		GlowStrength(8.f, false, config, ColorTarget::Block) != 80.f) {

@@ -9,6 +9,7 @@
 #include "../source/RedsandMeleeStyle.h"
 
 using namespace std::literals;
+using Redsand::Weapons::TrailLayer;
 namespace RedsandSettings { Config current; Config Get() { return current; } }
 namespace Settings { bool bDisplayTrails = true, bTrailUseAttackCollisionLength = false; }
 
@@ -28,17 +29,19 @@ bool selectedParticle = true, scopeAllowed = true;
 struct AttackTrail
 {
 	AttackTrail(Node* node, Handle actor, int cell, int* item, bool left, bool length,
-		std::optional<TrailOverride> supplied, bool native = false) :
-		redsandNativeOnly(native), actorHandle(actor), collisionNode(node), collisionParentNode(node),
+		std::optional<TrailOverride> supplied, TrailLayer layer = TrailLayer::Primary) :
+		redsandNativeOnly(layer == TrailLayer::Precision), actorHandle(actor), collisionNode(node), collisionParentNode(node),
 		passedCell(cell), passedItem(item), passedLeft(left), passedLength(length), passedOverride(supplied)
 	{
 		redsandConfig = RedsandSettings::Get();
-        redsandReleasedSelected = !native && redsandConfig.swordReleasedTrail;
-		redsandParticleSelected = selectedParticle;
-		redsandScopeAllowed = scopeAllowed;
+		redsandOrdinaryAllowed = !redsandNativeOnly && scopeAllowed && redsandConfig.swordEnabled;
+		redsandReleasedSelected = layer == TrailLayer::Primary && selectedParticle && scopeAllowed && redsandConfig.swordReleasedTrail;
+		redsandParticleSelected = (layer == TrailLayer::Primary && selectedParticle && redsandOrdinaryAllowed && !redsandReleasedSelected) ||
+			layer == TrailLayer::OrdinaryParticles;
 	}
 	~AttackTrail();
 	bool ShouldAddPrecisionTrail() const;
+	bool ShouldAddOrdinaryParticles() const;
 	void RetireRedsandNativeTrail();
 	void RetireRedsandSwingTrail() { bActive = false; }
 	bool Update(float a_deltaTime)
@@ -48,7 +51,7 @@ struct AttackTrail
 		return bActive;
 	}
 	bool redsandReleasedSelected = false;
-    bool redsandNativeOnly, redsandParticleSelected = false, redsandScopeAllowed = false, bActive = true;
+	bool redsandNativeOnly, redsandParticleSelected = false, redsandOrdinaryAllowed = false, bActive = true;
 	float redsandNativePendingTime = 0.f;
 	RedsandSettings::Config redsandConfig;
     std::string redsandEnchantmentKey = "none";
@@ -94,18 +97,21 @@ void RegistrationKeepsTwoVisualsWithoutRecursion()
 				selectedParticle = selected;
 				scopeAllowed = allowed;
 				Register(node, { node.get() }, 77, &item, true);
-				const bool two = keep && selected && allowed;
+				const bool two = allowed;
 				Check(trails.size() == (two ? 2 : 1), "registration changed default, excluded-scope or explicit external-mesh behavior");
 				Check(!trails[0]->redsandNativeOnly, "primary particle renderer was replaced");
 				if (!two) { continue; }
-				Check(trails[1]->redsandNativeOnly && !trails[1]->ShouldAddPrecisionTrail(), "second trail can recursively add more renderers");
+				const auto& nativeTrail = trails[selected ? 1 : 0];
+				Check(trails[1]->redsandNativeOnly == selected && !trails[1]->ShouldAddOrdinaryParticles() &&
+					(!selected || !nativeTrail->ShouldAddPrecisionTrail()), "explicit ribbon or companion used the wrong renderer");
 				for (const auto& trail : trails) {
 					Check(trail->collisionNode == node.get() && trail->actorHandle.get() == node.get() &&
 						trail->passedCell == 77 && trail->passedItem == &item && trail->passedLeft && trail->passedLength,
 						"two trails did not share the same attack's visual attachment and handedness");
 					Check(trail->Update(.016f) && trail->visualUpdates == 1, "a registered visual did not receive one update");
 				}
-				const auto native = trails[1]->trailParticle;
+				if (!selected) { continue; }
+				const auto native = nativeTrail->trailParticle;
 				trails.erase(trails.begin());
 				Check(trails[0]->Update(.016f) && !native->particleObject->culled, "particle removal destroyed the independent ribbon");
 				trails.clear();
@@ -118,7 +124,7 @@ void RegistrationKeepsTwoVisualsWithoutRecursion()
 void NativeOnlyLifecycleIsBoundedAndSwitchable()
 {
 	Node node;
-	auto make = [&] { return std::make_unique<AttackTrail>(&node, Handle{ &node }, 1, nullptr, false, false, std::nullopt, true); };
+	auto make = [&] { return std::make_unique<AttackTrail>(&node, Handle{ &node }, 1, nullptr, false, false, std::nullopt, TrailLayer::Precision); };
 	RedsandSettings::current = {};
 	RedsandSettings::current.swordReleasedTrail = false;
 	RedsandSettings::current.swordKeepPrecisionTrail = true;
@@ -132,7 +138,7 @@ void NativeOnlyLifecycleIsBoundedAndSwitchable()
 	for (unsigned reason = 0; reason < 8; ++reason) {
 		auto trail = make();
 		auto effect = trail->trailParticle;
-		if (reason == 0) { RedsandSettings::current.swordKeepPrecisionTrail = false; }
+		if (reason == 0) { RedsandSettings::current.swordReleasedTrail = true; }
 		if (reason == 1) { Settings::bDisplayTrails = false; }
 		if (reason == 2) { trail->actorHandle.value = nullptr; }
 		if (reason == 3) { trail->collisionNode = nullptr; }
@@ -142,7 +148,7 @@ void NativeOnlyLifecycleIsBoundedAndSwitchable()
 		if (reason == 7) { effect->particleObject->children.clear(); }
 		Check(!trail->Update(reason >= 5 ? 2.f : .016f) && !trail->bActive && effect->particleObject->culled,
 			"disabled, invalid or expired native trail survived");
-		RedsandSettings::current.swordKeepPrecisionTrail = true;
+		RedsandSettings::current.swordReleasedTrail = false;
 		Settings::bDisplayTrails = true;
 	}
 	auto pending = make();
@@ -241,11 +247,22 @@ int main()
 		auto first = std::make_shared<Node>();
 		auto second = std::make_shared<Node>();
 		int item = 1;
-		Register(first, {first.get()}, 1, &item, false);
-		Register(second, {first.get()}, 1, &item, false);
-		Check(trails.size() == 2 && trails[0]->redsandReleasedSelected && trails[1]->redsandReleasedSelected &&
-			trails[0]->collisionNode == first.get() && trails[1]->collisionNode == second.get(),
-			"each active collision should register one Redsand trail without an additional native ribbon");
+		for (const bool ordinary : {false, true}) {
+			trails.clear();
+			RedsandSettings::current.swordEnabled = ordinary;
+			Register(first, {first.get()}, 1, &item, false);
+			Register(second, {first.get()}, 1, &item, false);
+			const auto stride = ordinary ? 2u : 1u;
+			Check(trails.size() == 2 * stride && trails[0]->redsandReleasedSelected && trails[stride]->redsandReleasedSelected &&
+				trails[0]->collisionNode == first.get() && trails[stride]->collisionNode == second.get(),
+				"ordinary-particle toggle changed Redsand selection or spawned a native companion");
+			if (ordinary) {
+				Check(trails[1]->redsandParticleSelected && trails[3]->redsandParticleSelected &&
+					!trails[1]->redsandNativeOnly && !trails[3]->redsandNativeOnly &&
+					!trails[1]->redsandReleasedSelected && !trails[3]->redsandReleasedSelected,
+					"Redsand and ordinary particles did not get separate renderers");
+			}
+		}
 		trails.clear();
 		NativeOnlyLifecycleIsBoundedAndSwitchable();
 		NativeOverrideDoesNotInheritParticleOnlyDefinition();

@@ -7,6 +7,10 @@ const auto redsandRequestedMesh = redsandConfig.diagnostics ? trailMeshPath : st
 		trailMeshPath = Redsand::Weapons::ResolveMeleeMesh(redsandScopeAllowed, trailMeshPath, Settings::attackTrailMeshPath,
 			redsandRequestedMeshAvailable);
 		if (redsandNativeOnly && trailMeshPath.empty()) { trailMeshPath = "Effects/WeaponTrails/AttackTrail.nif"; }
+		if (a_layer == Redsand::Weapons::TrailLayer::OrdinaryParticles && redsandOrdinaryAllowed &&
+			!Redsand::Weapons::IsParticleMesh(trailMeshPath)) {
+			trailMeshPath = "RedsandParticles/Default.nif";
+		}
 		if (!redsandLegacyTrail && (trailMeshPath == Settings::attackTrailMeshPath || trailMeshPath == "Effects/WeaponTrails/AttackTrailMagic.nif")) {
 			trailMeshPath = "RedsandParticles/Default.nif";
 		}
@@ -28,7 +32,7 @@ const auto redsandRequestedMesh = redsandConfig.diagnostics ? trailMeshPath : st
 			}
 		}
 		redsandReleasedSelected = redsandReleasedSelected && Redsand::Weapons::IsParticleMesh(trailMeshPath);
-	if (redsandReleasedSelected) { trailMeshPath = "RedsandSwingTrail/Arc.nif"; }
+		if (redsandReleasedSelected) { trailMeshPath = "RedsandSwingTrail/Arc.nif"; }
 		redsandParticleSelected = Redsand::Weapons::IsParticleMesh(trailMeshPath);
 		if (redsandConfig.diagnostics) {
 			RedsandLog::info("Redsand melee scope: actor={:08X} player={} weapon={:08X} weaponType={} profile={} enabled={} playerEnabled={} npcEnabled={} allowed={} requested={} resolved={}",

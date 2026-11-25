@@ -82,7 +82,7 @@ def config_xml():
     for flag, caption, description in [
         ('hit', 'Hit sparks / 命中火花', 'Impact sparks.\n命中火花。'),
         ('slash', 'Slash light and sparks / 斩光与火花', 'Slash light and sparks following the weapon swing.\n沿挥刀方向显示斩光与飞溅火花。'),
-        ('block', 'Block flashes and sparks / 格挡闪光与火花', 'Block flashes, sparks, and optional lightning.\n格挡闪光、火花和可选闪电。')]:
+        ('block', 'Block sparks / 格挡火花', 'Block sparks and optional lightning.\n格挡火花和可选闪电。')]:
         group(combat, caption, flag, [
             ('on', 'Enable / 启用', description),
             ('off', 'Disable / 关闭', 'Start with this effect disabled.\n初始关闭此效果。')])

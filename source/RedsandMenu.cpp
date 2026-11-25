@@ -62,46 +62,13 @@ namespace RedsandMenu
 			Describe(help, config, description);
 		}
 
-		void BlockStyle(RedsandSettings::Config& config, const char*& description)
+		void Color(Label label, RedsandSettings::EffectColor& color, bool weaponColor, RedsandSettings::Config& config, const char*& description)
 		{
-			const auto state = RedsandImpactVFX::GetStatus();
-			const bool available = state.availability == RedsandImpactVFX::Availability::Ready && state.blockAvailable;
-			const bool canDisable = menu.BeginDisabled && menu.EndDisabled;
-			const Label label{ { "Block style", "格挡样式" }, "blockStyle" };
-			if (available || canDisable) {
-				if (canDisable) { menu.BeginDisabled(!available); }
-				constexpr RedsandSettings::BlockStyle styles[]{RedsandSettings::BlockStyle::NormalBlock,RedsandSettings::BlockStyle::TimedSparks,
-					RedsandSettings::BlockStyle::TimedFlare,RedsandSettings::BlockStyle::SimpleTimed,RedsandSettings::BlockStyle::StarRing};
-				const auto current=config.blockStyle==RedsandSettings::BlockStyle::PerfectRing ? RedsandSettings::BlockStyle::TimedFlare : config.blockStyle;
-				int selected=0;
-				for (int i=0;i<5;++i) { if (styles[i]==current) { selected=i;break; } }
-				const auto* choices = config.language == RedsandSettings::Language::Chinese ?
-					"普通火花\0密集火花\0闪光火花\0线状火花\0星芒火花\0" : "Sparks\0Dense sparks\0Flash sparks\0Line sparks\0Star sparks\0";
-				if (menu.Combo(label.Get(config).c_str(), &selected, choices, -1) && available) {
-					config.blockStyle = styles[std::clamp(selected,0,4)];
-					SaveNow(config);
-				}
-				if (canDisable) { menu.EndDisabled(); }
-			} else { menu.TextUnformatted(label.text.Get(config), nullptr); }
-			Describe(config.blockStyle == RedsandSettings::BlockStyle::StarRing ?
-				Text{ "Star sparks uses a fixed particle count. Color, brightness and size remain adjustable. Changes apply to the next block and do not change block timing or damage.",
-					"星芒火花的粒子数量固定，颜色、亮度和尺寸可调整。下次格挡生效，不改变判定或伤害。" } :
-				Text{ "Choose the visual shown on successful blocks. Changes apply to the next block and do not change block timing or damage. Missing styles use the default sparks.",
-					"选择成功格挡时的外观，下次格挡生效，不改变判定或伤害。样式资源缺失时使用普通火花。" }, config, description);
-			if (!available) {
-				menu.TextUnformatted(Text{ "Install the block-effects component to choose a style.", "安装格挡特效组件后可选择样式。" }.Get(config), nullptr);
-			}
-		}
-
-		void Color(Label label, RedsandSettings::ColorTarget target, RedsandSettings::Config& config, const char*& description)
-		{
-			auto& color = config.colors[static_cast<unsigned>(target)];
 			const auto caption = std::string(Text{ "Custom ", "自定义" }.Get(config)) + label.text.Get(config) + "###" + label.id + "Enabled";
 			if (menu.Checkbox(caption.c_str(), &color.custom)) { SaveNow(config); }
-			const bool weaponColor = target == RedsandSettings::ColorTarget::Melee || target == RedsandSettings::ColorTarget::Bow;
 			const Text colorHelp = weaponColor ?
-				Text{ "Use a fixed particle color. Uncheck for enchantment colors or the default blue. Separate profiles in More options take priority. Precision ribbon colors are unchanged.",
-					"勾选使用固定粒子颜色；取消后跟随附魔，无有效附魔时使用默认蓝色。“更多选项”的独立设置优先。不改变 Precision 剑影颜色。" } :
+				Text{ "Use a fixed effect color or inherit the enchantment's color. Independent enchantment settings take priority.",
+					"勾选使用固定粒子颜色；取消后跟随附魔，无有效附魔时使用默认蓝色。附魔类别的独立设置优先。" } :
 				Text{ "Use a custom color. Uncheck to restore this effect's default color.",
 					"勾选使用自定义颜色；取消后恢复此效果的默认颜色。" };
 			Describe(colorHelp, config, description);
@@ -127,26 +94,84 @@ namespace RedsandMenu
 				"点击色块选色或输入 RGB 数值，选色后自动启用。" }, config, description);
 		}
 
+		void Color(Label label, RedsandSettings::ColorTarget target, RedsandSettings::Config& config, const char*& description)
+		{
+			Color(label, config.colors[static_cast<unsigned>(target)],
+				target == RedsandSettings::ColorTarget::Melee || target == RedsandSettings::ColorTarget::Bow, config, description);
+		}
+
+		template <class Settings>
+		bool SwingDurationSlider(Label label, Settings& settings, const RedsandSettings::Config& config, const char*& description)
+		{
+			float duration = RedsandSettings::SwingDuration(settings);
+			const bool changed = menu.SliderFloat(label.Get(config).c_str(), &duration, RedsandSettings::minSwingDuration,
+				RedsandSettings::maxSwingDuration, Text{"%.3f s", "%.3f 秒"}.Get(config), 1 << 4);
+			if (changed) { RedsandSettings::SetSwingDuration(settings, duration); }
+			Describe({"Total time until the last grains fade. The arc fades first.", "从出现到散点淡完的总时长。主弧先淡出，散点随后消散。"}, config, description);
+			return changed;
+		}
+
+		constexpr Text swingSpeedHelp{"Adjust how far the dots drift and settle. 0 keeps them at their birth positions.", "控制圆点沿弧漂移和尾迹飘落的幅度，0 时留在出生位置。"};
+		bool DotDensitySlider(const char* id, float& value, const RedsandSettings::Config& config, const char*& description)
+		{
+			constexpr int alwaysClamp = 1 << 4, logarithmic = 1 << 5;
+			const auto caption = Label{{"Dot density", "圆点疏密"}, id}.Get(config);
+			const bool changed = menu.SliderFloat(caption.c_str(), &value, 0.f, RedsandSettings::maxRedsandDotDensity,
+				Text{"%.3fx", "%.3f 倍"}.Get(config), alwaysClamp | logarithmic);
+			Describe({"Higher values emit more closely spaced dots. 0 stops emission.",
+				"数值越大，圆点越多、间距越小，0 停止发射。"}, config, description);
+			return changed;
+		}
+		constexpr Text swingWidthHelp{"Spread grains to either side of the arc. 0 is a single row.", "控制散点向弧线两侧展开的宽度，0 为贴着弧线的单行。"};
+		constexpr Text swingArcBrightnessHelp{"Set the main arc glow. 0 hides the arc.", "调整主弧亮度，0 隐藏主弧。"};
+		bool ArcWidthSlider(Label label, float& width, const RedsandSettings::Config& config, const char*& description)
+		{
+			float multiplier = width / RedsandSettings::defaultRibbonWidth;
+			const bool changed = menu.SliderFloat(label.Get(config).c_str(), &multiplier, 0.f,
+				RedsandSettings::maxRibbonWidthMultiplier, Text{"%.2fx", "%.2f 倍"}.Get(config), 1 << 4);
+			if (changed) { width = multiplier * RedsandSettings::defaultRibbonWidth; }
+			Describe({"Scale the main arc width. 1 is the default, 0 hides the arc.",
+				"调整主弧宽度，1 为默认，0 隐藏主弧。"}, config, description);
+			return changed;
+		}
+
+		constexpr Text swingParticleBrightnessHelp{"Set the glow of the grains. 0 hides the grains.", "调整散点亮度，0 隐藏散点。"};
+		constexpr Text redsandDotBrightnessHelp{"Adjust only the Redsand dots. 0 hides them.", "只调整红沙圆点的亮度，0 隐藏圆点。"};
+		constexpr Text swingDensityHelp{"Set the number of fine particles. 0 stops emission.", "调整散点数量，0 停止发射。"};
+		constexpr Text swingSizeHelp{"Set the size of each newly emitted grain.", "调整新发射的每颗散点的尺寸。"};
+
+		bool MeleeMode(bool& redsand, const char* id, const RedsandSettings::Config& config)
+		{
+			int selection = redsand ? 1 : 0;
+			const auto choices = config.language == RedsandSettings::Language::Chinese ?
+				"Precision 剑影\0红沙模式\0" : "Precision trail\0Redsand mode\0";
+			if (!menu.Combo(Label{{"Trail type", "剑影类型"}, id}.Get(config).c_str(), &selection, choices, -1)) { return false; }
+			redsand = selection == 1;
+			return true;
+		}
+
 		void SwingTrailOptions(RedsandSettings::Config& config, const char*& description)
 		{
-			Checkbox({ { "Redsand mode", "红沙模式" }, "swordReleasedTrail" },config.swordReleasedTrail,config,
-				{ "Draw a short arc through the fast part of the swing, including swings that miss.",
-				  "只沿挥击的高速段画一道短弧，打空也生效。" },description);
-			if (config.swordReleasedTrail) {
-				Slider({ { "Redsand arc width", "红沙弧线宽度" }, "swordRibbonWidth" },config.swordRibbonWidth,.15f,3.f,config,
-					{ "Change the visible arc thickness live. Fine particles use their own size setting.", "实时调整发光弧线的粗细。散点粒子使用独立的尺寸设置。" },description);
-				Slider({ { "Arc hold time", "弧线保留时间" }, "swordRibbonLifetime" },config.swordRibbonLifetime,.03f,.8f,config,
-					{ "Time before the arc starts fading, up to 0.07 seconds in Redsand mode.", "主弧开始淡出前的保留时间，红沙模式最多 0.07 秒。" },description,true);
-				Slider({ { "Arc fade time", "弧线淡出时间" }, "swordRibbonFadeOut" },config.swordRibbonFadeOut,.06f,1.2f,config,
-					{ "Arc fade after the hold, up to 0.18 seconds in Redsand mode.", "主弧保留结束后的淡出时间，红沙模式最多 0.18 秒。" },description,true);
-				Slider({ { "Particle hold time", "粒子保留时间" }, "swordParticleLifetime" },config.swordParticleLifetime,.05f,1.2f,config,
-					{ "Time before sparks fade. Durations vary slightly around a base of at most 0.09 seconds.", "散点淡出前的保留时间，基准最多 0.09 秒，个体时长略有差异。" },description,true);
-				Slider({ { "Particle fade time", "粒子淡出时间" }, "swordParticleFadeOut" },config.swordParticleFadeOut,.08f,1.6f,config,
-					{ "Spark fade after the hold, up to 0.24 seconds in Redsand mode.", "散点保留结束后的淡出时间，红沙模式最多 0.24 秒。" },description,true);
-				Slider({ { "Particle gravity", "粒子重力" }, "swordParticleGravity" },config.swordParticleGravity,0.f,3.f,config,
-					{ "Downward acceleration of newly emitted fine particles with air resistance. 0 disables gravity. The arc stays unaffected; no damage or collision is added.", "控制新散点受空气阻力下落的强弱，0 关闭重力；剑影不受重力影响，不增加伤害或碰撞。" },description);
-				Slider({ { "Outward drift", "甩出漂移" }, "swordTrailMomentum" },config.swordTrailMomentum,0.f,1.f,config,{ "How much swing motion the loose particles inherit. The central arc stays on the blade path.", "控制散点继承的挥砍动量。主弧线留在刀刃经过的位置。" },description);
+			auto& style = config.redsand;
+			Slider({{"Arc brightness", "主弧亮度"}, "redsandArcBrightness"}, style.arcBrightness, 0.f, RedsandSettings::maxBrightness, config, swingArcBrightnessHelp, description);
+			Slider({{"Redsand dot brightness", "红沙圆点亮度"}, "redsandParticleBrightness"}, style.particleBrightness, 0.f, RedsandSettings::maxBrightness, config, redsandDotBrightnessHelp, description);
+			if (ArcWidthSlider({{"Redsand arc width", "红沙弧线宽度"}, "swordRibbonWidth"}, config.swordRibbonWidth, config, description)) {
+				RedsandSettings::Set(config);
 			}
+			if (menu.IsItemDeactivatedAfterEdit && menu.IsItemDeactivatedAfterEdit()) { RedsandSettings::FlushPendingSave(); }
+			if (SwingDurationSlider({{"Trail duration", "轨迹持续时间"}, "swordTrailDuration"}, config, config, description)) {
+				RedsandSettings::Set(config);
+			}
+			if (menu.IsItemDeactivatedAfterEdit && menu.IsItemDeactivatedAfterEdit()) { RedsandSettings::FlushPendingSave(); }
+			Slider({ { "Speed along arc", "沿弧速度" }, "swordTrailMomentum" },config.swordTrailMomentum,0.f,RedsandSettings::maxSwingSpeed,config,swingSpeedHelp,description);
+			Slider({{"Particle width", "粒子宽度"}, "swordParticleWidth"}, config.swordParticleWidth, 0.f,
+				RedsandSettings::maxSwingParticleWidth, config, swingWidthHelp, description);
+			if (DotDensitySlider("redsandDensity", style.density, config, description)) { RedsandSettings::Set(config); }
+			if (menu.IsItemDeactivatedAfterEdit && menu.IsItemDeactivatedAfterEdit()) { RedsandSettings::FlushPendingSave(); }
+			Slider({{"Particle size", "粒子尺寸"}, "redsandSize"}, style.size, RedsandSettings::minSize, RedsandSettings::maxSize, config, swingSizeHelp, description);
+			Color({{"Redsand color", "红沙颜色"}, "redsandRGB"}, style.color, true, config, description);
+			Checkbox({{"Player", "玩家"}, "redsandPlayer"}, style.player, config, {"Show Redsand for your character.", "显示玩家的红沙轨迹。"}, description);
+			Checkbox({{"NPCs", "非玩家角色"}, "redsandNPC"}, style.npc, config, {"Show Redsand for other characters.", "显示其他角色的红沙轨迹。"}, description);
 		}
 
 		bool Fold(Label label, const RedsandSettings::Config& config)
@@ -158,16 +183,22 @@ namespace RedsandMenu
 			return true;
 		}
 
-		void EnchantmentOptions(RedsandSettings::Config& config, const char*& description)
+		int EnchantmentScope(bool bow, const RedsandSettings::Config& config, const char*& description)
 		{
-			static int selected = 0;
+			static int meleeScope = 0;
+			static int bowScope = 0;
+			auto& selected = bow ? bowScope : meleeScope;
 			const char* labels = config.language == RedsandSettings::Language::Chinese ?
-				"无附魔／附魔电量不足\0火焰\0冰霜\0雷电\0原版绿色 Shader＋毒药\0原版紫色 Shader\0原版蓝色 Shader\0原版红色 Shader\0束缚武器\0太阳／破晓\0其他／未识别\0" :
-				"Unenchanted / depleted\0Fire\0Frost\0Shock\0Vanilla green shader / poison\0Vanilla purple shader\0Vanilla blue shader\0Vanilla red shader\0Bound weapons\0Sun / Dawnbreaker\0Other / unrecognized\0";
-			menu.Combo(Label{ { "Enchantment category", "附魔类别" }, "enchantmentChoice" }.Get(config).c_str(), &selected, labels, 11);
-			Describe({ "Categories use the existing enchantment matching order. Mods with matching effects join the same category. Multiple enchantments select one category without mixing colors or multiplying particles.",
-				"沿用现有附魔匹配顺序，MOD 中符合条件的附魔自动归类。多附魔选择一个类别，不混色、不按附魔数增加粒子。" }, config, description);
-			const auto key = std::string(RedsandEnchantmentProfiles::categoryKeys[selected]);
+				"全局\0无附魔／附魔电量不足\0火焰\0冰霜\0雷电\0原版绿色 Shader＋毒药\0原版紫色 Shader\0原版蓝色 Shader\0原版红色 Shader\0束缚武器\0太阳／破晓\0其他／未识别\0" :
+				"Global\0Unenchanted / depleted\0Fire\0Frost\0Shock\0Vanilla green shader / poison\0Vanilla purple shader\0Vanilla blue shader\0Vanilla red shader\0Bound weapons\0Sun / Dawnbreaker\0Other / unrecognized\0";
+			menu.Combo(Label{{"Scope", "设置范围"}, bow ? "bowEnchantmentScope" : "meleeEnchantmentScope"}.Get(config).c_str(), &selected, labels, 12);
+			Describe({"Global settings apply until a matching enchantment override is enabled.", "全局设置默认生效，启用对应附魔的覆盖后才使用分类设置。"}, config, description);
+			return std::clamp(selected, 0, static_cast<int>(RedsandEnchantmentProfiles::categoryKeys.size())) - 1;
+		}
+
+		void EnchantmentOptions(RedsandSettings::Config& config, const char*& description, int category, bool bow)
+		{
+			const auto key = std::string(RedsandEnchantmentProfiles::categoryKeys[category]);
 			const auto* saved = config.enchantments.Find(key);
 			auto appearance = saved ? *saved : RedsandSettings::EnchantmentAppearance{};
 			bool changed = false;
@@ -200,32 +231,42 @@ namespace RedsandMenu
 			check({ { "Use independent category settings", "使用此类别独立设置" }, "categoryEnabled" }, appearance.enabled,
 				{ "Use the melee and bow settings below independently of the main pages, including enable and actor scope. Turn off to inherit the main pages.",
 				  "使用下方独立的近战和弓箭参数，包括开关与角色范围，不受主页数值限制；关闭后沿用主页。" });
-			if (Fold({ { "Melee trails", "近战轨迹" }, "categoryMelee" }, config)) {
-				check({ { "Enable particles", "启用粒子" }, "categorySwordEnabled" }, appearance.swordEnabled, { "Enable melee particles for this category.", "启用此类别的近战粒子。" });
-				check({ { "Player", "玩家" }, "categorySwordPlayer" }, appearance.swordPlayer, { "Show this category's melee particles for the player.", "显示玩家使用此类别时的近战粒子。" });
-				check({ { "NPCs", "非玩家角色" }, "categorySwordNPC" }, appearance.swordNPC, { "Show this category's melee particles for NPCs.", "显示其他角色使用此类别时的近战粒子。" });
-				check({ { "Show Precision trail", "同时显示 Precision 剑影" }, "categorySwordRibbon" }, appearance.swordKeepPrecisionTrail,
-					{ "Show the companion Precision ribbon. Its original color rules remain unchanged, and Precision trails must also be enabled.", "同时显示 Precision 剑影，保留剑影原配色；也需开启 Precision 自身的剑影设置。" });
-				check({ { "Emit from weapon tip", "从武器尖端发射" }, "categorySwordTip" }, appearance.swordTip, { "Turn off to emit along the blade or weapon head.", "关闭后沿刃部或武器头部发射。" });
-				check({ { "Redsand mode", "红沙模式" }, "categoryReleasedTrail" },appearance.swordReleasedTrail,
-					{ "Draw the arc and sparks along the fast part of the swing.",
-					  "只沿挥击的高速段画出红沙弧线和火花。" });
+			if (appearance.enabled && !bow) {
+				changed |= MeleeMode(appearance.swordReleasedTrail, "categoryMeleeMode", config);
+				check({{"Add ordinary particles", "添加普通粒子"}, "categorySwordEnabled"}, appearance.swordEnabled,
+					{"Add weapon-shaped particles alongside the selected trail.", "在所选剑影上叠加随武器变化的普通粒子。"});
 				if (appearance.swordReleasedTrail) {
-					slider({ { "Arc hold time", "弧线保留时间" }, "categoryArcLife" },appearance.swordRibbonLifetime,.03f,.8f,{ "Time before the arc starts fading, up to 0.07 seconds in Redsand mode.", "主弧开始淡出前的保留时间，红沙模式最多 0.07 秒。" },true);
-					slider({ { "Arc fade time", "弧线淡出时间" }, "categoryArcFade" },appearance.swordRibbonFadeOut,.06f,1.2f,{ "Arc fade after the hold, up to 0.18 seconds in Redsand mode.", "主弧保留结束后的淡出时间，红沙模式最多 0.18 秒。" },true);
-					slider({ { "Particle hold time", "粒子保留时间" }, "categoryParticleLife" },appearance.swordParticleLifetime,.05f,1.2f,{ "Time before sparks fade. Durations vary slightly around a base of at most 0.09 seconds.", "散点淡出前的保留时间，基准最多 0.09 秒，个体时长略有差异。" },true);
-					slider({ { "Particle fade time", "粒子淡出时间" }, "categoryParticleFade" },appearance.swordParticleFadeOut,.08f,1.6f,{ "Spark fade after the hold, up to 0.24 seconds in Redsand mode.", "散点保留结束后的淡出时间，红沙模式最多 0.24 秒。" },true);
-					slider({ { "Particle gravity", "粒子重力" }, "categoryParticleGravity" },appearance.swordParticleGravity,0.f,3.f,{ "Gravity and air resistance for newly emitted fine particles. 0 disables gravity; the arc does not fall.", "新散点受重力及空气阻力影响，0 关闭重力；剑影不会下落。" });
-					slider({ { "Arc width", "弧线宽度" }, "categoryArcWidth" },appearance.swordRibbonWidth,.15f,3.f,{ "Arc width is separate from the small residual particles.", "弧线宽度独立于细小残迹粒子。" });
-					slider({ { "Outward drift", "甩出漂移" }, "categoryArcDrift" },appearance.swordTrailMomentum,0.f,1.f,{ "How much swing motion the loose particles inherit. The central arc stays on the blade path.", "控制散点继承的挥砍动量。主弧线留在刀刃经过的位置。" });
+					menu.Separator();
+					menu.TextUnformatted(Text{"Redsand mode", "红沙模式"}.Get(config), nullptr);
+					auto& style = appearance.redsand;
+					slider({{"Arc brightness", "主弧亮度"}, "categoryArcBrightness"}, style.arcBrightness, 0.f, RedsandSettings::maxBrightness, swingArcBrightnessHelp);
+					slider({{"Redsand dot brightness", "红沙圆点亮度"}, "categoryRedBrightness"}, style.particleBrightness, 0.f, RedsandSettings::maxBrightness, redsandDotBrightnessHelp);
+					changed |= ArcWidthSlider({{"Arc width", "弧线宽度"}, "categoryArcWidth"}, appearance.swordRibbonWidth, config, description);
+					changed |= SwingDurationSlider({{"Trail duration", "轨迹持续时间"}, "categoryTrailDuration"}, appearance, config, description);
+					slider({{"Speed along arc", "沿弧速度"}, "categoryArcDrift"}, appearance.swordTrailMomentum, 0.f, RedsandSettings::maxSwingSpeed, swingSpeedHelp);
+					slider({{"Particle width", "粒子宽度"}, "categoryParticleWidth"}, appearance.swordParticleWidth, 0.f, RedsandSettings::maxSwingParticleWidth, swingWidthHelp);
+					changed |= DotDensitySlider("categoryRedDensity", style.density, config, description);
+					slider({{"Particle size", "粒子尺寸"}, "categoryRedSize"}, style.size, RedsandSettings::minSize, RedsandSettings::maxSize, swingSizeHelp);
+					color(style.color, "categoryRedsandColor");
+					check({{"Player", "玩家"}, "categoryRedsandPlayer"}, style.player, {"Show Redsand for your character.", "显示玩家的红沙轨迹。"});
+					check({{"NPCs", "非玩家角色"}, "categoryRedsandNPC"}, style.npc, {"Show Redsand for other characters.", "显示其他角色的红沙轨迹。"});
 				}
-				color(appearance.color, "categoryMeleeColor");
-				slider({ { "Brightness", "亮度" }, "categorySwordBrightness" }, appearance.brightness, 0.f, RedsandSettings::maxBrightness, { "Independent melee brightness. 0 hides the glow; it does not stop emission.", "独立近战亮度；0 隐藏发光，不停止发射。" });
-				slider({ { "Particle count", "粒子数量" }, "categorySwordDensity" }, appearance.density, 0.f, RedsandSettings::maxDensity, { "Independent melee count. 0 stops new emission; higher counts cost more performance.", "独立近战数量；0 停止新发射，数量越多性能开销越大。" });
-				slider({ { "Particle size", "粒子尺寸" }, "categorySwordSize" }, appearance.size, RedsandSettings::minSize, RedsandSettings::maxSize, { "Independent melee particle size.", "独立近战粒子尺寸。" });
-				slider({ { "Spread", "散布宽度" }, "categorySwordSpread" }, appearance.spread, 0.f, RedsandSettings::maxSpread, { "Independent spread for melee trail particles.", "独立调整近战轨迹粒子的散布。" });
+				if (appearance.swordEnabled) {
+					menu.Separator();
+					menu.TextUnformatted(Text{"Ordinary particles", "普通粒子"}.Get(config), nullptr);
+					slider({{"Ordinary particle brightness", "普通粒子亮度"}, "categorySwordBrightness"}, appearance.brightness, 0.f, RedsandSettings::maxBrightness, swingParticleBrightnessHelp);
+					slider({{"Particle count", "粒子数量"}, "categorySwordDensity"}, appearance.density, 0.f, RedsandSettings::maxDensity, swingDensityHelp);
+					slider({{"Particle size", "粒子尺寸"}, "categorySwordSize"}, appearance.size, RedsandSettings::minSize, RedsandSettings::maxSize, swingSizeHelp);
+					slider({{"Spread", "散布宽度"}, "categorySwordSpread"}, appearance.spread, 0.f, RedsandSettings::maxSpread,
+						{"Adjust ordinary particle scatter.", "调整普通近战粒子的散布。"});
+					color(appearance.color, "categoryMeleeColor");
+					check({{"Player", "玩家"}, "categorySwordPlayer"}, appearance.swordPlayer, {"Show particles for your character.", "显示玩家的普通粒子。"});
+					check({{"NPCs", "非玩家角色"}, "categorySwordNPC"}, appearance.swordNPC, {"Show particles for other characters.", "显示其他角色的普通粒子。"});
+					check({{"Emit from weapon tip", "从武器尖端发射"}, "categorySwordTip"}, appearance.swordTip,
+						{"Uncheck to emit along the blade or weapon head.", "关闭后沿刃部或武器头部发射。"});
+				}
 			}
-			if (Fold({ { "Bow trails", "弓箭轨迹" }, "categoryBow" }, config)) {
+			if (appearance.enabled && bow) {
 				check({ { "Enable particles", "启用粒子" }, "categoryBowEnabled" }, appearance.bowEnabled, { "Enable bow and crossbow particles for this category.", "启用此类别的弓和弩粒子。" });
 				check({ { "Player", "玩家" }, "categoryBowPlayer" }, appearance.bowPlayer, { "Show this category's bow particles for the player.", "显示玩家使用此类别时的弓箭粒子。" });
 				check({ { "NPCs", "非玩家角色" }, "categoryBowNPC" }, appearance.bowNPC, { "Show this category's bow particles for NPCs.", "显示其他角色使用此类别时的弓箭粒子。" });
@@ -240,8 +281,9 @@ namespace RedsandMenu
 			if (menu.SmallButton(Label{ { "Reset this category", "重置此类别" }, "resetEnchantment" }.Get(config).c_str())) { appearance = {}; changed = true; }
 			Describe({ "Reset this category and disable its independent settings. Other categories and main settings are unchanged.", "重置并关闭此类别独立设置，其他类别和主页设置不变。" }, config, description);
 			if (changed) { config.enchantments.Set(key, appearance); RedsandSettings::Set(config); }
-			menu.TextUnformatted(Text{ "Category settings replace the main pages; values are not multiplied together. Existing colors and matching priorities are preserved in Original color mode.",
-				"分类参数替代主页参数，不与主页相乘。原配色模式保留现有颜色与匹配优先级。" }.Get(config), nullptr);
+			if (!appearance.enabled) {
+				menu.TextUnformatted(Text{"This category uses the global settings.", "此类别当前使用全局设置。"}.Get(config), nullptr);
+			}
 		}
 
 		void __stdcall Render()
@@ -267,47 +309,49 @@ namespace RedsandMenu
 			menu.Separator();
 			if (menu.BeginTabBar("RedsandParticleTabs", 0)) {
 				if (menu.BeginTabItem(Label{ { "Melee trails", "近战轨迹" }, "redsandMelee" }.Get(config).c_str(), nullptr, 0)) {
-					Checkbox({ { "Enable particles", "启用粒子" }, "swordEnabled" }, config.swordEnabled, config,
-						{ "Show particles along melee weapon swings.", "挥动近战武器时显示粒子轨迹。" }, description);
-					Checkbox({ { "Show Precision trail", "同时显示 Precision 剑影" }, "swordKeepPrecisionTrail" }, config.swordKeepPrecisionTrail, config,
-						{ "Show Precision's weapon ribbon alongside ordinary particles. Redsand mode replaces this ribbon. Precision's own trail setting must also be enabled.",
-						  "普通粒子与 Precision 剑影同时显示；红沙模式启用时替换原剑影。也需开启 Precision 自身的剑影设置。" }, description);
-					Slider({ { "Brightness", "亮度" }, "swordBrightness" }, config.swordBrightness, 0.0f, RedsandSettings::maxBrightness, config,
-						{ "Adjust particle glow. 0 hides the particles; bloom also depends on your graphics settings.",
-						  "调整粒子发光亮度，0 隐藏粒子；泛光强弱也受画面设置影响。" }, description);
-					Slider({ { "Particle count", "粒子数量" }, "swordDensity" }, config.swordDensity, 0.0f, RedsandSettings::maxDensity, config,
-						{ "Adjust trail density. 0 stops new particles; higher counts cost more performance.",
-						  "调整轨迹疏密，0 停止发射粒子；数量越多，性能开销越大。" }, description);
-					Slider({ { "Particle size", "粒子尺寸" }, "swordSize" }, config.swordSize, RedsandSettings::minSize, RedsandSettings::maxSize, config,
-						{ "Adjust the size of each particle. Applies to newly emitted particles.",
-						  "调整每颗粒子的大小，作用于新发射的粒子。" }, description);
-					SwingTrailOptions(config,description);
-					Color({ { "Melee particle color", "近战粒子颜色" }, "meleeRGB" }, RedsandSettings::ColorTarget::Melee, config, description);
-					if (Fold({ { "More options", "更多选项" }, "meleeAdvanced" }, config)) {
-						Checkbox({ { "Player", "玩家" }, "swordPlayer" }, config.swordPlayer, config,
-							{ "Show melee particles for your character.", "显示玩家的近战粒子。" }, description);
-						Checkbox({ { "NPCs", "非玩家角色" }, "swordNPC" }, config.swordNPC, config,
-							{ "Show melee particles for other characters, including followers and enemies.", "显示其他角色的近战粒子，包括随从和敌人。" }, description);
-						Checkbox({ { "Emit from weapon tip", "从武器尖端发射" }, "swordTip" }, config.swordTip, config,
-							{ "Place particles along the weapon tip's path. Uncheck to emit along the blade or weapon head.",
-							  "沿武器尖端的运动路径发射粒子；关闭后沿刃部或武器头部发射。" }, description);
-						Slider({ { "Spread", "散布宽度" }, "swordSpread" }, config.swordSpread, 0.0f, RedsandSettings::maxSpread, config,
-							{ "Lower values keep particles closer to the weapon path. 0 is narrowest, with slight random motion remaining.",
-							  "数值越小，粒子越贴近武器轨迹；0 最收束，仍保留少量随机运动。" }, description);
+					const int category = EnchantmentScope(false, config, description);
+					if(category>=0) {
+						EnchantmentOptions(config, description, category, false);
+					} else {
+						if (MeleeMode(config.swordReleasedTrail, "swordMeleeMode", config)) { SaveNow(config); }
+						Checkbox({{"Add ordinary particles", "添加普通粒子"}, "swordEnabled"}, config.swordEnabled, config,
+							{"Add weapon-shaped particles alongside the selected trail.", "在所选剑影上叠加随武器变化的普通粒子。"}, description);
+						if (config.swordReleasedTrail) {
+							menu.Separator();
+							menu.TextUnformatted(Text{"Redsand mode", "红沙模式"}.Get(config), nullptr);
+							SwingTrailOptions(config, description);
+						}
+						if (config.swordEnabled) {
+							menu.Separator();
+							menu.TextUnformatted(Text{"Ordinary particles", "普通粒子"}.Get(config), nullptr);
+							Slider({{"Ordinary particle brightness", "普通粒子亮度"}, "swordBrightness"}, config.swordBrightness, 0.f, RedsandSettings::maxBrightness, config, swingParticleBrightnessHelp, description);
+							Slider({{"Particle count", "粒子数量"}, "swordDensity"}, config.swordDensity, 0.f, RedsandSettings::maxDensity, config, swingDensityHelp, description);
+							Slider({{"Particle size", "粒子尺寸"}, "swordSize"}, config.swordSize, RedsandSettings::minSize, RedsandSettings::maxSize, config, swingSizeHelp, description);
+							Slider({{"Spread", "散布宽度"}, "swordSpread"}, config.swordSpread, 0.f, RedsandSettings::maxSpread, config,
+								{"Adjust ordinary particle scatter.", "调整普通近战粒子的散布。"}, description);
+							Color({{"Melee particle color", "近战粒子颜色"}, "meleeRGB"}, RedsandSettings::ColorTarget::Melee, config, description);
+							Checkbox({{"Player", "玩家"}, "swordPlayer"}, config.swordPlayer, config, {"Show particles for your character.", "显示玩家的普通粒子。"}, description);
+							Checkbox({{"NPCs", "非玩家角色"}, "swordNPC"}, config.swordNPC, config, {"Show particles for other characters.", "显示其他角色的普通粒子。"}, description);
+							Checkbox({{"Emit from weapon tip", "从武器尖端发射"}, "swordTip"}, config.swordTip, config,
+								{"Uncheck to emit along the blade or weapon head.", "关闭后沿刃部或武器头部发射。"}, description);
+						}
 					}
 					menu.EndTabItem();
 				}
 				if (menu.BeginTabItem(Label{ { "Bow trails", "弓箭轨迹" }, "redsandBow" }.Get(config).c_str(), nullptr, 0)) {
-					Checkbox({ { "Enable particles", "启用粒子" }, "bowEnabled" }, config.bowEnabled, config,
-						{ "Show particles when using bows and crossbows.", "使用弓或弩时显示粒子特效。" }, description);
-					Slider({ { "Brightness", "亮度" }, "bowBrightness" }, config.bowBrightness, 0.0f, RedsandSettings::maxBrightness, config,
-						{ "Adjust particle glow. 0 hides the particles; bloom also depends on your graphics settings.",
-						  "调整粒子发光亮度，0 隐藏粒子；泛光强弱也受画面设置影响。" }, description);
-					Slider({ { "Particle count", "粒子数量" }, "bowDensity" }, config.bowDensity, 0.0f, RedsandSettings::maxDensity, config,
-						{ "Adjust particle density. 0 stops new particles; higher counts cost more performance.",
-						  "调整粒子疏密，0 停止发射粒子；数量越多，性能开销越大。" }, description);
-					Color({ { "Bow particle color", "弓箭粒子颜色" }, "bowRGB" }, RedsandSettings::ColorTarget::Bow, config, description);
-					if (Fold({ { "More options", "更多选项" }, "bowAdvanced" }, config)) {
+					const int category = EnchantmentScope(true, config, description);
+					if(category>=0) {
+						EnchantmentOptions(config, description, category, true);
+					} else {
+						Checkbox({ { "Enable particles", "启用粒子" }, "bowEnabled" }, config.bowEnabled, config,
+							{ "Show particles when using bows and crossbows.", "使用弓或弩时显示粒子特效。" }, description);
+						Slider({ { "Brightness", "亮度" }, "bowBrightness" }, config.bowBrightness, 0.0f, RedsandSettings::maxBrightness, config,
+							{ "Adjust particle glow. 0 hides the particles; bloom also depends on your graphics settings.",
+							  "调整粒子发光亮度，0 隐藏粒子；泛光强弱也受画面设置影响。" }, description);
+						Slider({ { "Particle count", "粒子数量" }, "bowDensity" }, config.bowDensity, 0.0f, RedsandSettings::maxDensity, config,
+							{ "Adjust particle density. 0 stops new particles; higher counts cost more performance.",
+							  "调整粒子疏密，0 停止发射粒子；数量越多，性能开销越大。" }, description);
+						Color({ { "Bow particle color", "弓箭粒子颜色" }, "bowRGB" }, RedsandSettings::ColorTarget::Bow, config, description);
 						Checkbox({ { "Player", "玩家" }, "bowPlayer" }, config.bowPlayer, config,
 							{ "Show bow and crossbow particles for your character.", "显示玩家使用弓或弩时的粒子。" }, description);
 						Checkbox({ { "NPCs", "非玩家角色" }, "bowNPC" }, config.bowNPC, config,
@@ -329,52 +373,29 @@ namespace RedsandMenu
 					Checkbox({ { "Hit sparks", "命中火花" }, "impactHit" }, config.impactHit, config,
 						{ "Show melee hit sparks and metal or stone impact bursts.",
 						  "近战命中时显示火花，也替换金属、石头等物体的命中效果。" }, description);
+					Slider({ { "Hit particle count", "受击粒子数量" }, "hitDensity" }, config.hitDensity, 0.f, RedsandSettings::maxDensity, config,
+						{ "Adjust the sparks emitted when hitting characters, stone, or metal. 0 stops emission.",
+						  "调整击中人物、石头或金属时的火花数量，0 停止发射。" }, description);
+					Slider({ { "Hit particle size", "受击粒子大小" }, "hitSize" }, config.hitSize, RedsandSettings::minSize, RedsandSettings::maxSize, config,
+						{ "Scale the hit spark burst, including spark size and reach.",
+						  "缩放受击火花，包括火花的大小和扩散距离。" }, description);
+					Slider({ { "Hit particle brightness", "受击粒子亮度" }, "hitBrightness" }, config.hitBrightness, 0.f, RedsandSettings::maxBrightness, config,
+						{ "Adjust glow for hit sparks. Bloom also depends on your graphics settings.",
+						  "调整受击火花的发光亮度，泛光强弱也受画面设置影响。" }, description);
+					Color({ { "Hit sparks", "命中火花颜色" }, "hitRGB" }, RedsandSettings::ColorTarget::Hit, config, description);
+					menu.Separator();
 					Checkbox({ { "Slash effects", "斩击特效" }, "impactSlash" }, config.impactSlash, config,
 						{ "When a blade hits a character, show a cut of light along the swing direction. Can be combined with hit sparks.",
 						  "刃器命中角色时，沿挥击方向显示切光，可与命中火花同时开启。" }, description);
-					Checkbox({ { "Block effects", "格挡特效" }, "impactBlock" }, config.impactBlock, config,
-						{ "Show the selected sparks or flash when an attack is blocked. Does not change block timing or damage.",
-						  "成功挡住攻击时显示所选火花或闪光，不改变格挡判定或伤害。" }, description);
-					BlockStyle(config, description);
-                    if (Fold({ { "Block lightning and sparks", "格挡闪电与火花" }, "blockLightningOptions" }, config)) {
-                        Checkbox({ { "Add lightning on player blocks", "玩家格挡叠加闪电" }, "blockLightning" }, config.blockLightning, config,
-                            { "Add 3D arcs on successful player blocks. An installed sparks companion uses the same trigger and color.",
-                              "玩家成功格挡时叠加三维电弧。装有配套火花资源时，火花和电弧共用触发概率与颜色。" }, description);
-                        Checkbox({ { "Chance-based activation", "概率触发" }, "blockLightningRandomTrigger" }, config.blockLightningRandomTrigger, config,
-                            { "Roll once per successful block for the added effects. Turn off to activate them on every block.",
-                              "每次成功格挡为叠加特效抽取一次。关闭后每次格挡都触发。" }, description);
-                        float percent = config.blockLightningChance*100.f;
-                        const bool canDisableChance = menu.BeginDisabled && menu.EndDisabled;
-                        if (canDisableChance) menu.BeginDisabled(!config.blockLightningRandomTrigger);
-                        if (menu.SliderFloat(Label{ { "Activation chance", "触发概率" }, "blockLightningChance" }.Get(config).c_str(), &percent, 0.f, 100.f, "%.0f%%", 1 << 4)) {
-                            config.blockLightningChance = percent/100.f; SaveNow(config);
-                        }
-                        Describe({ "Used when chance-based activation is on. 0% never triggers; 100% always triggers.",
-                                   "开启概率触发时生效。0% 不触发，100% 每次触发。" }, config, description);
-                        if (canDisableChance) menu.EndDisabled();
-                        Checkbox({ { "Random lightning color", "闪电颜色随机" }, "blockLightningRandomColor" }, config.blockLightningRandomColor, config,
-                            { "Choose one RGB color per activation for the arcs and their companion sparks. Turn off to use your default lightning color.",
-                              "每次触发生成一组 RGB，电弧和配套火花共用。关闭后使用下方的默认闪电颜色。" }, description);
-                        if (menu.ColorEdit3) {
-                            if (menu.ColorEdit3(Label{ { "Default lightning color", "闪电默认颜色" }, "blockLightningRGB" }.Get(config).c_str(), config.blockLightningColor.data(), 1 << 5)) {
-                                RedsandSettings::Set(config);
-                            }
-                            if (menu.IsItemDeactivatedAfterEdit && menu.IsItemDeactivatedAfterEdit()) RedsandSettings::FlushPendingSave();
-                        } else {
-                            const char* channelNames[] = { "R###blockLightningR", "G###blockLightningG", "B###blockLightningB" };
-                            menu.TextUnformatted(Text{ "Default lightning color", "闪电默认颜色" }.Get(config), nullptr);
-                            for (unsigned k = 0; k < 3; ++k) {
-                                if (menu.SliderFloat(channelNames[k], &config.blockLightningColor[k], 0.f, 1.f, "%.3f", 1 << 4)) RedsandSettings::Set(config);
-                            }
-                        }
-                        Describe({ "Click the swatch to preview and choose RGB/HSV. Used on the next activation when random colors are off; your selection is saved while random colors are on.",
-                                   "点击色块预览并用 RGB/HSV 选色。关闭颜色随机后，下次触发使用此色；开启随机时仍保留你的选色。" }, config, description);
-                        Slider({ { "Lightning glow", "闪电亮度" }, "blockLightningBrightness" }, config.blockLightningBrightness, 0.f, RedsandSettings::maxBrightness, config,
-                            { "Adjust lightning glow only. Bloom depends on your graphics setup.", "只调整闪电发光强度，泛光观感取决于画面设置。" }, description);
-                        Slider({ { "Lightning reach", "闪电扩散范围" }, "blockLightningSize" }, config.blockLightningSize, .1f, 3.f, config,
-                            { "Scale the 3D arcs around the block point. Larger arcs can be hidden behind nearby scenery.",
-                              "缩放格挡点周围的三维电弧，附近场景会遮挡电弧。" }, description);
-                    }
+					Slider({ { "Cut brightness", "切线亮度" }, "cutBrightness" }, config.cutBrightness, 0.f, RedsandSettings::maxBrightness, config,
+						{ "Adjust the glow of the cut line only.", "只调整斩击切线的发光亮度。" }, description);
+					Slider({ { "Cut length", "切光长度" }, "cutLength" }, config.cutLength, RedsandSettings::minCutLength, RedsandSettings::maxCutLength, config,
+						{ "Adjust the length of the cut of light along the swing. Does not change its width or the sparks.",
+						  "调整沿挥击方向延伸的切光长度，不改变宽度或火花轨迹。" }, description);
+					Slider({ { "Cut thickness", "斩击线粗细" }, "cutWidth" }, config.cutWidth, RedsandSettings::minCutWidth, RedsandSettings::maxCutWidth, config,
+						{ "Scale the thickness of the cut of light. 1.0 is the mesh's original width.",
+						  "调整斩击线的粗细。1.0 为模型的基准线宽。" }, description);
+					Color({ { "Cut of light", "切光颜色" }, "cutRGB" }, RedsandSettings::ColorTarget::Cut, config, description);
 					Checkbox({ { "Random slash colors", "斩击颜色随机" }, "slashRandomColor" }, config.slashRandomColor, config,
 						{ "Choose one random RGB color per attack for the cut of light and its paired contact sparks. Brightness is unchanged. Numeric variation is controlled separately. Turn off to use your saved colors.",
 						  "每次攻击随机生成一组 RGB，切光与配对的命中火花共用。亮度不变；数值随机由另一开关控制。关闭后使用已保存的颜色。" }, description);
@@ -389,35 +410,51 @@ namespace RedsandMenu
                     if (menu.IsItemDeactivatedAfterEdit && menu.IsItemDeactivatedAfterEdit()) { RedsandSettings::FlushPendingSave(); }
                     Describe({ "50% varies each slash setting from 50% to 150% of its saved value, within that setting's limits. 0% disables numeric variation; 100% permits up to double.",
                         "50% 表示各项数值在当前值的 50%～150% 之间变化，并受各参数上下限约束。0% 不浮动，100% 最高可到两倍。" }, config, description);
-					Slider({ { "Hit particle count", "受击粒子数量" }, "hitDensity" }, config.hitDensity, 0.f, RedsandSettings::maxDensity, config,
-						{ "Adjust the sparks emitted when hitting characters, stone, or metal. 0 stops emission.",
-						  "调整击中人物、石头或金属时的火花数量，0 停止发射。" }, description);
-					Slider({ { "Hit particle size", "受击粒子大小" }, "hitSize" }, config.hitSize, RedsandSettings::minSize, RedsandSettings::maxSize, config,
-						{ "Scale the hit spark burst, including spark size and reach.",
-						  "缩放受击火花，包括火花的大小和扩散距离。" }, description);
-					Slider({ { "Hit particle brightness", "受击粒子亮度" }, "hitBrightness" }, config.hitBrightness, 0.f, RedsandSettings::maxBrightness, config,
-						{ "Adjust glow for hit sparks. Bloom also depends on your graphics settings.",
-						  "调整受击火花的发光亮度，泛光强弱也受画面设置影响。" }, description);
-					Slider({ { "Cut brightness", "切线亮度" }, "cutBrightness" }, config.cutBrightness, 0.f, RedsandSettings::maxBrightness, config,
-						{ "Adjust the glow of the cut line only.", "只调整斩击切线的发光亮度。" }, description);
-					Slider({ { "Block effect brightness", "格挡特效亮度" }, "impactBrightness" }, config.impactBrightness, 0.f, RedsandSettings::maxBrightness, config,
-						{ "Adjust the glow of the selected block effect.", "调整所选格挡特效的发光亮度。" }, description);
-					Slider({ { "Block particle count", "格挡粒子数量" }, "impactDensity" }, config.impactDensity, 0.f, RedsandSettings::maxDensity, config,
-						{ "Adjust the spark count of the selected block effect. 0 stops emission.",
-						  "调整所选格挡特效的火花数量，0 停止发射。" }, description);
+					menu.Separator();
+					Checkbox({ { "Block sparks", "格挡火花" }, "impactBlock" }, config.impactBlock, config,
+						{ "Show sparks at the point of contact on successful blocks.", "成功格挡时从接触点散出火花。" }, description);
+					Slider({ { "Block sparks brightness", "格挡火花亮度" }, "impactBrightness" }, config.impactBrightness, 0.f, RedsandSettings::maxBrightness, config,
+						{ "Adjust the glow of the block sparks.", "调整格挡火花的发光亮度。" }, description);
+					Slider({ { "Block spark count", "格挡火花数量" }, "impactDensity" }, config.impactDensity, 0.f, RedsandSettings::maxDensity, config,
+						{ "Adjust the number of block sparks. 0 stops emission.", "调整格挡火花数量，0 停止发射。" }, description);
 					Slider({ { "Block and cut scale", "格挡与切线整体尺寸" }, "impactSize" }, config.impactSize, RedsandSettings::minSize, RedsandSettings::maxSize, config,
 						{ "Scale block effects and the cut line, including their width and reach.",
 						  "整体缩放格挡特效与切线，同时影响宽度和范围。" }, description);
-					Slider({ { "Cut length", "切光长度" }, "cutLength" }, config.cutLength, RedsandSettings::minCutLength, RedsandSettings::maxCutLength, config,
-						{ "Adjust the length of the cut of light along the swing. Does not change its width or the sparks.",
-						  "调整沿挥击方向延伸的切光长度，不改变宽度或火花轨迹。" }, description);
-					Slider({ { "Cut thickness", "斩击线粗细" }, "cutWidth" }, config.cutWidth, RedsandSettings::minCutWidth, RedsandSettings::maxCutWidth, config,
-						{ "Scale the thickness of the cut of light. 1.0 is the mesh's original width.",
-						  "调整斩击线的粗细。1.0 为模型的基准线宽。" }, description);
+					Color({ { "Block sparks", "格挡火花颜色" }, "blockRGB" }, RedsandSettings::ColorTarget::Block, config, description);
 					menu.Separator();
-					Color({ { "Hit sparks", "命中火花颜色" }, "hitRGB" }, RedsandSettings::ColorTarget::Hit, config, description);
-					Color({ { "Cut of light", "切光颜色" }, "cutRGB" }, RedsandSettings::ColorTarget::Cut, config, description);
-					Color({ { "Block effects", "格挡特效颜色" }, "blockRGB" }, RedsandSettings::ColorTarget::Block, config, description);
+					Checkbox({ { "Add lightning on player blocks", "玩家格挡叠加闪电" }, "blockLightning" }, config.blockLightning, config,
+					    { "Add 3D arcs on successful player blocks. An installed sparks companion uses the same trigger and color.",
+					      "玩家成功格挡时叠加三维电弧。装有配套火花资源时，火花和电弧共用触发概率与颜色。" }, description);
+					float percent = config.blockLightningRandomTrigger ? config.blockLightningChance * 100.f : 100.f;
+					if (menu.SliderFloat(Label{ { "Lightning chance", "闪电触发概率" }, "blockLightningChance" }.Get(config).c_str(), &percent, 0.f, 100.f, "%.0f%%", 1 << 4)) {
+						config.blockLightningRandomTrigger = percent < 100.f;
+						config.blockLightningChance = percent / 100.f;
+						SaveNow(config);
+					}
+					Describe({ "0% disables the extra effect. 100% triggers on every successful player block.",
+						"0% 不触发叠加特效，100% 时每次成功格挡都触发。" }, config, description);
+					Checkbox({ { "Random lightning color", "闪电颜色随机" }, "blockLightningRandomColor" }, config.blockLightningRandomColor, config,
+					    { "Choose one RGB color per activation for the arcs and their companion sparks. Turn off to use your default lightning color.",
+					      "每次触发生成一组 RGB，电弧和配套火花共用。关闭后使用下方的默认闪电颜色。" }, description);
+					if (menu.ColorEdit3) {
+					    if (menu.ColorEdit3(Label{ { "Default lightning color", "闪电默认颜色" }, "blockLightningRGB" }.Get(config).c_str(), config.blockLightningColor.data(), 1 << 5)) {
+					        RedsandSettings::Set(config);
+					    }
+					    if (menu.IsItemDeactivatedAfterEdit && menu.IsItemDeactivatedAfterEdit()) RedsandSettings::FlushPendingSave();
+					} else {
+					    const char* channelNames[] = { "R###blockLightningR", "G###blockLightningG", "B###blockLightningB" };
+					    menu.TextUnformatted(Text{ "Default lightning color", "闪电默认颜色" }.Get(config), nullptr);
+					    for (unsigned k = 0; k < 3; ++k) {
+					        if (menu.SliderFloat(channelNames[k], &config.blockLightningColor[k], 0.f, 1.f, "%.3f", 1 << 4)) RedsandSettings::Set(config);
+					    }
+					}
+					Describe({ "Click the swatch to preview and choose RGB/HSV. Used on the next activation when random colors are off; your selection is saved while random colors are on.",
+					           "点击色块预览并用 RGB/HSV 选色。关闭颜色随机后，下次触发使用此色；开启随机时仍保留你的选色。" }, config, description);
+					Slider({ { "Lightning glow", "闪电亮度" }, "blockLightningBrightness" }, config.blockLightningBrightness, 0.f, RedsandSettings::maxBrightness, config,
+					    { "Adjust lightning glow only. Bloom depends on your graphics setup.", "只调整闪电发光强度，泛光观感取决于画面设置。" }, description);
+					Slider({ { "Lightning reach", "闪电扩散范围" }, "blockLightningSize" }, config.blockLightningSize, .1f, 3.f, config,
+					    { "Scale the 3D arcs around the block point. Larger arcs can be hidden behind nearby scenery.",
+					      "缩放格挡点周围的三维电弧，附近场景会遮挡电弧。" }, description);
 					const auto state = RedsandImpactVFX::GetStatus();
 					if (state.availability != RedsandImpactVFX::Availability::Ready) {
 						const auto unavailable = state.availability == RedsandImpactVFX::Availability::InvalidRoutes ?
@@ -425,10 +462,6 @@ namespace RedsandMenu
 							Text{ "Effect resources are not loaded. Check the mod installation and restart the game.", "特效资源尚未载入，请检查模组安装并重新启动游戏。" };
 						menu.TextUnformatted(unavailable.Get(config), nullptr);
 					}
-					menu.EndTabItem();
-				}
-				if (menu.BeginTabItem(Label{ { "More options", "更多选项" }, "redsandMoreOptions" }.Get(config).c_str(), nullptr, 0)) {
-					EnchantmentOptions(config, description);
 					menu.EndTabItem();
 				}
 				menu.EndTabBar();

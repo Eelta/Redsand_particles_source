@@ -1,7 +1,7 @@
 	if (redsandNativeOnly) {
 		auto redsandRibbonConfig = RedsandSettings::Get();
 		RedsandSettings::ApplyMeleeAppearance(redsandRibbonConfig, redsandEnchantmentKey, "");
-		if (!bActive || !redsandRibbonConfig.swordKeepPrecisionTrail || !Settings::bDisplayTrails ||
+		if (!bActive || redsandRibbonConfig.swordReleasedTrail || !Settings::bDisplayTrails ||
 			!actorHandle.get() || !collisionNode || !collisionParentNode || !trailParticle ||
 			trailParticle->age > trailParticle->lifetime) {
 			RetireRedsandNativeTrail();

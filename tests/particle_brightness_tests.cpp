@@ -28,6 +28,8 @@ struct Geometry { std::string_view name = "RedsandParticles_Drain_v1"; };
 struct Trail
 {
 	bool redsandLegacyTrail = false;
+	bool redsandReleasedSelected = false;
+	float redsandPointMaterialBrightness = 0.f;
 	RedsandSettings::Config redsandConfig;
 	Color redsandInheritedColor{ .025f, .080f, .650f, 1.f };
 	std::optional<Color> baseColorOverride = redsandInheritedColor;
@@ -93,4 +95,10 @@ int main()
 	Check(white.baseColor.red == .025f && white.baseColor.green == .080f && white.baseColor.blue == .650f,
 		"Depleted weapon inherited stale white material instead of resolved blue");
 	Check(white.baseColor.alpha == .27f, "Depleted weapon color reset fade alpha");
+	depleted.redsandReleasedSelected = true;
+	depleted.redsandPointMaterialBrightness = .75f;
+	depleted.redsandConfig.redsand.arcBrightness = 8.f;
+	depleted.Update(&geometry, &white);
+	Check(std::abs(white.baseColorScale * .65f - 14.04f * .75f) < .0001f,
+		"red arc brightness changed the dots' independently resolved material brightness");
 }

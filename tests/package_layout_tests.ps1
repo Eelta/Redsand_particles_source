@@ -120,21 +120,11 @@ foreach ($profile in @('Default') + $weaponProfiles) {
 }
 Require ($installed.ContainsKey('SKSE\Plugins\Precision.dll')) 'Required game files missing from installation'
 $settings = ReadSettings (StageFile 'SKSE\Plugins\RedsandParticles.ini')
-$defaults = @{
-    Menu = @{ Language='English'; DiagnosticLogging='false' }
-    SwordParticles = @{ Enabled='true'; Player='true'; NPC='true'; Tip='true'; KeepPrecisionTrail='true'; ReleasedTrail='false'; RibbonLifetime='0.2'; ParticleLifetime='0.3'; RibbonWidth='0.5'; TrailMomentum='0.1'; RibbonFadeOut='0.25'; ParticleFadeOut='0.4'; ParticleGravity='0.3'; Brightness='1'; Density='1'; Spread='1'; Size='1' }
-    BowParticles = @{ Enabled='true'; Player='true'; NPC='true'; Brightness='1'; Density='1'; Gathering='true'; Rings='true'; Trails='true' }
-    ImpactVFX = @{ Enabled='true'; Hit='true'; Slash='true'; RandomSlashColor='false'; RandomSlashValues='false'; RandomSlashRange='0.5'; Block='true'; BlockStyle='0'; Brightness='1'; Density='0.1'; Size='1'; HitBrightness='1'; HitDensity='0.1'; HitSize='1'; CutBrightness='1'; CutLength='1'; CutWidth='1' }
-    BlockLightning = @{ Enabled='false'; RandomTrigger='true'; Chance='0.10'; RandomColor='false'; Brightness='1'; Size='1'; R='0.12'; G='0.58'; B='1' }
-}
-$defaults['Color.Melee'] = @{ Enabled='false'; R='0.0384615'; G='0.123077'; B='1' }
-$defaults['Color.Bow'] = @{ Enabled='false'; R='0.0384615'; G='0.123077'; B='1' }
-$defaults['Color.Hit'] = @{ Enabled='true'; R='1'; G='0.72'; B='0.24' }
-foreach ($profile in @('none','fire','frost','shock','green','purple','blue','red','bound','sun','unknown')) {
-    $defaults["Enchantment.$profile"] = @{ Enabled='false'; CustomColor='false'; R='.0384615'; G='.123077'; B='1'; Brightness='1'; Density='1'; Size='1'; Spread='1'; SwordEnabled='true'; SwordPlayer='true'; SwordNPC='true'; SwordTip='true'; SwordKeepPrecisionTrail='true'; ReleasedTrail='false'; RibbonLifetime='0.2'; ParticleLifetime='0.3'; RibbonWidth='0.5'; TrailMomentum='0.1'; RibbonFadeOut='0.25'; ParticleFadeOut='0.4'; ParticleGravity='0.3'; BowEnabled='true'; BowPlayer='true'; BowNPC='true'; BowGathering='true'; BowRings='true'; BowTrails='true'; BowCustomColor='false'; BowBrightness='1'; BowDensity='1'; BowSize='1'; BowR='.0384615'; BowG='.123077'; BowB='1' }
-}
-$defaults['Color.Cut'] = @{ Enabled='true'; R='0.835886'; G='0.537747'; B='0' }
-$defaults['Color.Block'] = @{ Enabled='true'; R='1'; G='0.72'; B='0.24' }
+$defaults = ReadSettings (Join-Path $AssetsPath 'Basic/SKSE/Plugins/RedsandParticles.ini')
+Require ($defaults.Menu.Language -eq 'English') 'The published preset must use English'
+Require ($defaults.SwordParticles.ReleasedTrail -eq 'true') 'The published preset must select Redsand mode'
+Require ($defaults.ImpactVFX.RandomSlashColor -eq 'false' -and $defaults.ImpactVFX.RandomSlashValues -eq 'false') 'The published preset must keep randomized slash settings off'
+Require (($defaults.Keys | Where-Object { $_ -like 'Enchantment.*' }).Count -eq 11) 'The published preset is missing enchantment categories'
 Require (-not $settings.ContainsKey('StaffParticles')) 'Removed staff settings must not be packaged'
 Require ($settings.Count -eq $defaults.Count) 'Unexpected or missing INI sections'
 foreach ($section in $defaults.Keys) {
@@ -201,7 +191,7 @@ $expectedVersion = (Get-Content -LiteralPath (Join-Path (Split-Path -Parent $PSS
 Require ($manifest.PSObject.Properties.Name -contains 'packageVersion' -and $manifest.packageVersion -eq $expectedVersion) 'Manifest packageVersion must match build.json'
 Require ($manifest.PSObject.Properties.Name -contains 'redsandESPRequired' -and $manifest.redsandESPRequired -is [bool] -and !$manifest.redsandESPRequired) 'Redsand must not require its legacy ESP'
 Require ($manifest.PSObject.Properties.Name -contains 'independentDiagnosticLog' -and $manifest.independentDiagnosticLog -ceq 'RedsandParticles.log') 'Diagnostics must use the independent RedsandParticles.log file'
-Require ($manifest.PSObject.Properties.Name -contains 'diagnosticLoggingDefault' -and $manifest.diagnosticLoggingDefault -is [bool] -and !$manifest.diagnosticLoggingDefault) 'Diagnostic logging must default to off'
+Require ($manifest.PSObject.Properties.Name -contains 'diagnosticLoggingDefault' -and $manifest.diagnosticLoggingDefault -is [bool] -and $manifest.diagnosticLoggingDefault -eq [bool]::Parse($defaults.Menu.DiagnosticLogging)) 'Diagnostic logging metadata must match the published preset'
 Require ($manifest.diagnosticLogMode -ceq 'OverwritePerGameSession' -and $manifest.diagnosticLogMaxBytes -eq 8388608) 'Diagnostics must overwrite previous game sessions and cap one file at 8 MiB'
 Require ($manifest.footIKDriverInfoOffset -eq '0x88') 'Incorrect Foot IK driver layout offset'
 Require ($manifest.footIKFixRuntimes -contains 'SE' -and $manifest.footIKFixRuntimes -contains 'AE') 'Foot IK fix must cover SE and AE'

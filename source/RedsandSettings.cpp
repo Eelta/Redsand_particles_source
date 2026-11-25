@@ -10,6 +10,7 @@
 #include <iomanip>
 #include <locale>
 #include <limits>
+#include <map>
 #include <mutex>
 #include <optional>
 #include <string>
@@ -52,15 +53,23 @@ namespace RedsandSettings
 			auto valid = [](float value, float maximum, float minimum = 0.0f, float fallback = 1.0f) {
 				return std::isfinite(value) ? std::clamp(value, minimum, maximum) : fallback;
 			};
+			const auto normalizeTrail = [&](RedsandTrailStyle& trail) {
+				trail.arcBrightness = valid(trail.arcBrightness, maxBrightness);
+				trail.particleBrightness = valid(trail.particleBrightness, maxBrightness);
+				trail.density = valid(trail.density, maxRedsandDotDensity);
+				trail.size = valid(trail.size, maxSize, minSize);
+				for (std::size_t k = 0; k < 3; ++k) { trail.color.rgb[k] = valid(trail.color.rgb[k], 1.f, 0.f, defaultColors[0].rgb[k]); }
+			};
+			normalizeTrail(config.redsand);
 			if (config.language != Language::English && config.language != Language::Chinese) { config.language = Language::English; }
-			if (config.blockStyle >= BlockStyle::Count) { config.blockStyle = BlockStyle::NormalBlock; }
 			config.swordRibbonLifetime = valid(config.swordRibbonLifetime, .8f, .03f, .2f);
-			config.swordParticleLifetime = std::max(config.swordRibbonLifetime+.02f, valid(config.swordParticleLifetime, 1.2f, .05f, .3f));
-			config.swordRibbonWidth = valid(config.swordRibbonWidth, 3.f, .15f, .5f);
-			config.swordTrailMomentum = valid(config.swordTrailMomentum, 1.f, 0.f, .1f);
+			config.swordParticleLifetime = valid(config.swordParticleLifetime, 1.2f, .05f, .3f);
+			config.swordRibbonWidth = valid(config.swordRibbonWidth, defaultRibbonWidth * maxRibbonWidthMultiplier, 0.f, defaultRibbonWidth);
+			config.swordTrailMomentum = valid(config.swordTrailMomentum, maxSwingSpeed, 0.f, defaultSwingSpeed);
 			config.swordRibbonFadeOut = valid(config.swordRibbonFadeOut, 1.2f, .06f, .25f);
-			config.swordParticleFadeOut = std::max(config.swordRibbonLifetime+config.swordRibbonFadeOut+.04f-config.swordParticleLifetime, valid(config.swordParticleFadeOut, 1.6f, .08f, .4f));
+			config.swordParticleFadeOut = valid(config.swordParticleFadeOut, 1.6f, .08f, .4f);
 			config.swordParticleGravity = valid(config.swordParticleGravity, 3.f, 0.f, .3f);
+			config.swordParticleWidth = valid(config.swordParticleWidth, maxSwingParticleWidth, 0.f, 0.f);
 			config.swordBrightness = valid(config.swordBrightness, maxBrightness);
 			config.swordDensity = valid(config.swordDensity, maxDensity);
 			config.swordSpread = valid(config.swordSpread, maxSpread, 0.0f, defaultSpread);
@@ -89,13 +98,15 @@ namespace RedsandSettings
 			if (config.enchantments.values) {
 				auto profiles = std::make_shared<EnchantmentProfiles::Map>(*config.enchantments.values);
 				for (auto& [key, appearance] : *profiles) {
+					normalizeTrail(appearance.redsand);
 					appearance.swordRibbonLifetime = valid(appearance.swordRibbonLifetime, .8f, .03f, .2f);
-					appearance.swordParticleLifetime = std::max(appearance.swordRibbonLifetime+.02f, valid(appearance.swordParticleLifetime, 1.2f, .05f, .3f));
-					appearance.swordRibbonWidth = valid(appearance.swordRibbonWidth, 3.f, .15f, .5f);
-					appearance.swordTrailMomentum = valid(appearance.swordTrailMomentum, 1.f, 0.f, .1f);
+					appearance.swordParticleLifetime = valid(appearance.swordParticleLifetime, 1.2f, .05f, .3f);
+					appearance.swordRibbonWidth = valid(appearance.swordRibbonWidth, defaultRibbonWidth * maxRibbonWidthMultiplier, 0.f, defaultRibbonWidth);
+					appearance.swordTrailMomentum = valid(appearance.swordTrailMomentum, maxSwingSpeed, 0.f, defaultSwingSpeed);
 					appearance.swordRibbonFadeOut = valid(appearance.swordRibbonFadeOut, 1.2f, .06f, .25f);
-					appearance.swordParticleFadeOut = std::max(appearance.swordRibbonLifetime+appearance.swordRibbonFadeOut+.04f-appearance.swordParticleLifetime, valid(appearance.swordParticleFadeOut, 1.6f, .08f, .4f));
+					appearance.swordParticleFadeOut = valid(appearance.swordParticleFadeOut, 1.6f, .08f, .4f);
 					appearance.swordParticleGravity = valid(appearance.swordParticleGravity, 3.f, 0.f, .3f);
+					appearance.swordParticleWidth = valid(appearance.swordParticleWidth, maxSwingParticleWidth, 0.f, 0.f);
 					appearance.brightness = valid(appearance.brightness, maxBrightness);
 					appearance.density = valid(appearance.density, maxDensity);
 					appearance.size = valid(appearance.size, maxSize, minSize);
@@ -162,19 +173,45 @@ namespace RedsandSettings
 			if (parsed.ec == std::errc{} && parsed.ptr == value.data() + value.size()) { output = levels[std::clamp(result, 0, 3)]; }
 		}
 
-		void ReadBlockStyle(std::string_view value, BlockStyle& output)
+		float MigrateRedsandDensity(float density, float spacing)
 		{
-			if (value.empty()) { return; }
-			unsigned result = 0;
-			const auto parsed = std::from_chars(value.data(), value.data() + value.size(), result);
-			if (parsed.ec == std::errc{} && parsed.ptr == value.data() + value.size() && result < static_cast<unsigned>(BlockStyle::Count)) {
-				output = static_cast<BlockStyle>(result);
-			}
+			return std::clamp(density, 0.f, maxDensity) / (.65f + .35f * std::clamp(spacing, 0.f, maxSpread));
+		}
+
+		void ReadRedsandStyle(RedsandTrailStyle& trail, std::string_view key, std::string_view value, std::optional<float>& oldSpacing)
+		{
+			if (key == "arcbrightness") { ReadFloat(value, trail.arcBrightness); }
+			else if (key == "particlebrightness") { ReadFloat(value, trail.particleBrightness); }
+			else if (key == "density") { ReadFloat(value, trail.density); }
+			else if (key == "size") { ReadFloat(value, trail.size); }
+			else if (key == "spacing") { ReadFloat(value, oldSpacing); }
+			else if (key == "player") { ReadBool(value, trail.player); }
+			else if (key == "npc") { ReadBool(value, trail.npc); }
+			else if (key == "customcolor") { ReadBool(value, trail.color.custom); }
+			else if (key == "r") { ReadFloat(value, trail.color.rgb[0]); }
+			else if (key == "g") { ReadFloat(value, trail.color.rgb[1]); }
+			else if (key == "b") { ReadFloat(value, trail.color.rgb[2]); }
+		}
+
+		void WriteRedsandStyle(std::ostream& output, const RedsandTrailStyle& trail, std::string_view prefix = {})
+		{
+			output << '\n' << prefix << "ArcBrightness=" << trail.arcBrightness
+				<< '\n' << prefix << "ParticleBrightness=" << trail.particleBrightness;
+			const auto precision = output.precision(std::numeric_limits<float>::max_digits10);
+			output << '\n' << prefix << "Density=" << trail.density;
+			output.precision(precision);
+			output << '\n' << prefix << "Size=" << trail.size
+				<< '\n' << prefix << "Player=" << trail.player << '\n' << prefix << "NPC=" << trail.npc
+				<< '\n' << prefix << "CustomColor=" << trail.color.custom << '\n' << prefix << "R=" << trail.color.rgb[0]
+				<< '\n' << prefix << "G=" << trail.color.rgb[1] << '\n' << prefix << "B=" << trail.color.rgb[2] << '\n';
 		}
 
 		Config Read(std::istream& input)
 		{
 			Config result;
+			bool hasRedsandStyle = false;
+			std::optional<float> oldSpacing;
+			std::map<std::string, std::optional<float>> redsandCategories;
 			std::optional<float> hitBrightness, hitDensity, hitSize, cutBrightness;
 			std::string section, line;
 			while (std::getline(input, line)) {
@@ -197,6 +234,9 @@ namespace RedsandSettings
 						else if (language == "chinese") { result.language = Language::Chinese; }
 					}
 					else if (key == "diagnosticlogging") { ReadBool(value, result.diagnostics); }
+				} else if (section == "redsandtrail") {
+					ReadRedsandStyle(result.redsand, key, value, oldSpacing);
+					hasRedsandStyle = true;
 				} else if (section == "swordparticles") {
 					if (key == "enabled") { ReadBool(value, result.swordEnabled); }
 					else if (key == "player") { ReadBool(value, result.swordPlayer); }
@@ -210,6 +250,7 @@ namespace RedsandSettings
 					else if (key == "ribbonfadeout") { ReadFloat(value, result.swordRibbonFadeOut); }
 					else if (key == "particlefadeout") { ReadFloat(value, result.swordParticleFadeOut); }
 					else if (key == "particlegravity") { ReadFloat(value, result.swordParticleGravity); }
+					else if (key == "particlewidth") { ReadFloat(value, result.swordParticleWidth); }
 					else if (key == "keepprecisiontrail") { ReadBool(value, result.swordKeepPrecisionTrail); }
 					else if (key == "brightness") { ReadFloat(value, result.swordBrightness); }
 					else if (key == "density") { ReadFloat(value, result.swordDensity); }
@@ -232,7 +273,6 @@ namespace RedsandSettings
 					else if (key == "randomslashvalues") { ReadBool(value, result.slashRandomValues); }
 					else if (key == "randomslashrange") { ReadFloat(value, result.slashRandomRange); }
 					else if (key == "block") { ReadBool(value, result.impactBlock); }
-					else if (key == "blockstyle") { ReadBlockStyle(value, result.blockStyle); }
 					else if (key == "brightnesslevel") { ReadLevel(value, result.impactBrightness, impactBrightnessLevels); }
 					else if (key == "densitylevel") { ReadLevel(value, result.impactDensity, impactDensityLevels); }
 					else if (key == "sizelevel") { ReadLevel(value, result.impactSize, impactSizeLevels); }
@@ -258,7 +298,10 @@ namespace RedsandSettings
 				} else if (section.starts_with("enchantment.")) {
 					const auto profileKey = section.substr(12);
 					auto appearance = result.enchantments.Find(profileKey) ? *result.enchantments.Find(profileKey) : EnchantmentAppearance{};
-					if (key == "enabled") { ReadBool(value, appearance.enabled); }
+					if (key.starts_with("redsand")) {
+						ReadRedsandStyle(appearance.redsand, std::string_view(key).substr(7), value, redsandCategories[profileKey]);
+					}
+					else if (key == "enabled") { ReadBool(value, appearance.enabled); }
 					else if (key == "customcolor") { ReadBool(value, appearance.color.custom); }
 					else if (key == "r") { ReadFloat(value, appearance.color.rgb[0]); }
 					else if (key == "g") { ReadFloat(value, appearance.color.rgb[1]); }
@@ -275,6 +318,7 @@ namespace RedsandSettings
 					else if (key == "ribbonfadeout") { ReadFloat(value, appearance.swordRibbonFadeOut); }
 					else if (key == "particlefadeout") { ReadFloat(value, appearance.swordParticleFadeOut); }
 					else if (key == "particlegravity") { ReadFloat(value, appearance.swordParticleGravity); }
+					else if (key == "particlewidth") { ReadFloat(value, appearance.swordParticleWidth); }
 					else if (key == "swordenabled") { ReadBool(value, appearance.swordEnabled); }
 					else if (key == "swordplayer") { ReadBool(value, appearance.swordPlayer); }
 					else if (key == "swordnpc") { ReadBool(value, appearance.swordNPC); }
@@ -309,6 +353,25 @@ namespace RedsandSettings
 			result.hitDensity = hitDensity.value_or(result.impactDensity);
 			result.hitSize = hitSize.value_or(result.impactSize);
 			result.cutBrightness = cutBrightness.value_or(result.impactBrightness);
+			if (!hasRedsandStyle) {
+				result.redsand = {result.swordBrightness, result.swordBrightness, MigrateRedsandDensity(result.swordDensity, result.swordSpread),
+					result.swordSize, result.swordPlayer, result.swordNPC, result.colors[0]};
+			} else if (oldSpacing) {
+				result.redsand.density = MigrateRedsandDensity(result.redsand.density, *oldSpacing);
+			}
+			if (result.enchantments.values) {
+				auto profiles = std::make_shared<EnchantmentProfiles::Map>(*result.enchantments.values);
+				for (auto& [key, appearance] : *profiles) {
+					const auto configured = redsandCategories.find(key);
+					if (configured == redsandCategories.end()) {
+						appearance.redsand = {appearance.brightness, appearance.brightness, MigrateRedsandDensity(appearance.density, appearance.spread),
+							appearance.size, appearance.swordPlayer, appearance.swordNPC, appearance.color};
+					} else if (configured->second) {
+						appearance.redsand.density = MigrateRedsandDensity(appearance.redsand.density, *configured->second);
+					}
+				}
+				result.enchantments.values = std::move(profiles);
+			}
 			return Normalize(result);
 		}
 
@@ -345,6 +408,7 @@ namespace RedsandSettings
 					<< "RibbonFadeOut=" << config.swordRibbonFadeOut << '\n'
 					<< "ParticleFadeOut=" << config.swordParticleFadeOut << '\n'
 					<< "ParticleGravity=" << config.swordParticleGravity << '\n'
+					<< "ParticleWidth=" << config.swordParticleWidth << '\n'
 					<< "Brightness=" << config.swordBrightness << '\n'
 					<< "Density=" << config.swordDensity << '\n'
 					<< "Spread=" << config.swordSpread << '\n'
@@ -367,7 +431,6 @@ namespace RedsandSettings
 					<< "RandomSlashValues=" << config.slashRandomValues << '\n'
 					<< "RandomSlashRange=" << config.slashRandomRange << '\n'
 					<< "Block=" << config.impactBlock << '\n'
-					<< "BlockStyle=" << static_cast<unsigned>(config.blockStyle) << '\n'
 					<< "Brightness=" << config.impactBrightness << '\n'
 					<< "Density=" << config.impactDensity << '\n'
 					<< "Size=" << config.impactSize << '\n'
@@ -393,6 +456,8 @@ namespace RedsandSettings
 					output << "\n[Color." << colorNames[i] << "]\nEnabled=" << color.custom
 						<< "\nR=" << color.rgb[0] << "\nG=" << color.rgb[1] << "\nB=" << color.rgb[2] << '\n';
 				}
+				output << "\n[RedsandTrail]";
+				WriteRedsandStyle(output, config.redsand);
 				if (config.enchantments.values) {
 					for (const auto& [key, appearance] : *config.enchantments.values) {
 						output << "\n[Enchantment." << key << "]\nEnabled=" << appearance.enabled
@@ -408,6 +473,7 @@ namespace RedsandSettings
 							<< "\nRibbonFadeOut=" << appearance.swordRibbonFadeOut
 							<< "\nParticleFadeOut=" << appearance.swordParticleFadeOut
 							<< "\nParticleGravity=" << appearance.swordParticleGravity
+							<< "\nParticleWidth=" << appearance.swordParticleWidth
 							<< "\nSwordEnabled=" << appearance.swordEnabled
 							<< "\nSwordPlayer=" << appearance.swordPlayer
 							<< "\nSwordNPC=" << appearance.swordNPC
@@ -426,6 +492,7 @@ namespace RedsandSettings
 							<< "\nBowR=" << appearance.bowColor.rgb[0]
 							<< "\nBowG=" << appearance.bowColor.rgb[1]
 							<< "\nBowB=" << appearance.bowColor.rgb[2] << '\n';
+						WriteRedsandStyle(output, appearance.redsand, "Redsand");
 					}
 				}
 				output.flush();

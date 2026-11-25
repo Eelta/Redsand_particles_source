@@ -25,7 +25,8 @@ namespace RedsandAppearance
 	inline float RateFactor(const RedsandSettings::Config& config, RedsandSettings::ColorTarget target)
 	{
 		const auto density = target == RedsandSettings::ColorTarget::Hit ? config.hitDensity : config.impactDensity;
-		return density * RedsandSettings::impactDensityBaseline;
+		const float styleScale = target == RedsandSettings::ColorTarget::Block ? .60f : 1.f;
+		return density * RedsandSettings::impactDensityBaseline * styleScale;
 	}
 	template <class Sequence, class Activate>
 	inline void StartBlockSequenceOnce(float& marker, Sequence* sequence, Activate&& activate)
